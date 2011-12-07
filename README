@@ -17,3 +17,8 @@ data/
 
 graph/
 	All graphs output here. *Note: do not git add this dir.*
+
+Files
+=====
+.gitignore
+	Tell git not to track dirs such as data, graph, etc.
