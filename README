@@ -1,5 +1,19 @@
 Before Everything
 =================
-* All readme file is created by `ReStructuredText <http://docutils.sourceforge.net/rst.html>`_.
-* Git Repo: git@github.com:chucheng/TwitterResearch.git
+* All readme file should be created by `ReStructuredText <http://docutils.sourceforge.net/rst.html>`_.
+* Git Repo: git@github.com:chucheng/TwitterResearch.git 
 
+Directory
+=========
+src/
+	Python source code.
+
+script/
+	For every source code in src/, create a script for the code here so that
+	a user may trigger the source code here.
+
+data/
+	All data files. *Note: do not git add this dir.*
+
+graph/
+	All graphs output here. *Note: do not git add this dir.*
