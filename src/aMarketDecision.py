@@ -4,6 +4,7 @@ import Util
 from MarketDecisionUtils import *
 from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
+import matplotlib.axis 
 
 _PERCENTAGES = [.02, .05, .10]
 _LABELS = ['Top 2%', 'Top 5%', 'Top 10%']
@@ -150,10 +151,11 @@ def draw_avg_change_graph(avg_rank_changes, max_y):
 
     plt.legend(plots, _LABELS)
     plt.axis([1, _NUM_TIME_PERIODS + 1, 0, int(max_y)])
-    plt.grid(True, 'major', linewidth=2)
+    plt.grid(True, which='major', linewidth=2)
+    
     ax.xaxis.set_minor_locator(MultipleLocator(5))
     ax.yaxis.set_minor_locator(MultipleLocator(100))
-    plt.grid(True, 'minor')
+    plt.grid(True, which='minor')
     plt.xlabel('time (hours)')
     plt.ylabel('average difference ($R_{x}$ vs $R_{t}$)')
     plt.title('Average Change in Rank from Time Period to True Count')
@@ -191,10 +193,10 @@ def draw_big_changes_graph(big_rank_changes, max_y):
     plt.legend(plots, _LABELS)
     plt.legend(loc=4)
     plt.axis([1, _NUM_TIME_PERIODS + 1, 0, int(max_y)])
-    plt.grid(True, 'major', linewidth=2)
+    plt.grid(True, which='major', linewidth=2)
     ax.xaxis.set_minor_locator(MultipleLocator(5))
     ax.yaxis.set_minor_locator(MultipleLocator(100))
-    plt.grid(True, 'minor')
+    plt.grid(True, which='minor')
     plt.xlabel('time (hours)')
     plt.ylabel(('num rank changes (> %s percent)'
                 % int(100 * _BIG_CHANGE_THRESHOLD_PERCENTAGE)))
@@ -235,10 +237,10 @@ def draw_stability_graph(stabilities, max_y):
 
     plt.legend(plots, _LABELS, loc='lower right')
     plt.axis([1, _NUM_TIME_PERIODS + 1, 0, int(max_y * 1.10)])
-    plt.grid(True, 'major', linewidth=2)
+    plt.grid(True, which='major', linewidth=2)
     ax.xaxis.set_minor_locator(MultipleLocator(5))
     ax.yaxis.set_minor_locator(MultipleLocator(5))
-    plt.grid(True, 'minor')
+    plt.grid(True, which='minor')
     plt.xlabel('time (hours)')
     plt.ylabel('percentage still in top X%')
     plt.title('Stability of Top X% Between Time Period and True Count')
