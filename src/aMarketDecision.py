@@ -1,6 +1,7 @@
-__author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
+import Configuration
+import Util
 
-from Market_Decision_Utils import *
+from MarketDecisionUtils import *
 from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
 
@@ -8,6 +9,7 @@ _PERCENTAGES = [.02, .05, .10]
 _LABELS = ['Top 2%', 'Top 5%', 'Top 10%']
 _BIG_CHANGE_THRESHOLD_PERCENTAGE = 0.02
 _NUM_TIME_PERIODS = 100
+_GRAPH_DIR = None # defined right after _get_graph_output_dir()
 
 """
 This module performs an analysis on how the rank of a tweet changes between
@@ -33,7 +35,23 @@ draw_avg_change_graph -- Draws the appropriate graph.
 draw_big_changes -- Draws the appropriate graph.
 draw_stability -- Draws the appropriate graph.
 run -- Main logic.
+
+
+__author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 """
+
+def _get_graph_output_dir():
+    """Assign an output path for the graph(s).
+    
+    """
+    cfg = Configuration.getConfig()
+    graph_dir = cfg.get("Path", "base-dir") + cfg.get("Path", "graph-dir")
+    graph_dir += "MarketDecision/"
+    Util.ensure_dir_exist(graph_dir)
+    return graph_dir
+
+
+_GRAPH_DIR = _get_graph_output_dir()
 
 def calculate_stability(hour, true_ranks, percentage):
     """Compares "stability" of a time period against the true count values.
@@ -51,7 +69,7 @@ def calculate_stability(hour, true_ranks, percentage):
     stability -- The percentage of the top X% of urls that stay the same.
                           compared to the true counts, as an int
     """
-    time_file_path = RELATIVE_PATH_TO_DATA + FILE_TEMPLATE % hour
+    time_file_path = FULL_PATH_TO_DATA + FILE_TEMPLATE % hour
 
     rank_cutoff = int(percentage * len(true_ranks))
 
@@ -84,7 +102,7 @@ def calculate_changes(hour, true_ranks, percentage):
     num_big_changes_in_rank -- The number of changes in rank exceeding the
                                given threshold
     """
-    time_file_path = RELATIVE_PATH_TO_DATA + FILE_TEMPLATE % hour
+    time_file_path = FULL_PATH_TO_DATA + FILE_TEMPLATE % hour
 
     # Calculate necessary threshold values.
     num_urls_to_consider = int(percentage * len(true_ranks))
@@ -140,8 +158,10 @@ def draw_avg_change_graph(avg_rank_changes, max_y):
     plt.ylabel('average difference ($R_{x}$ vs $R_{t}$)')
     plt.title('Average Change in Rank from Time Period to True Count')
 
-    with open('avg_change_in_rank.png', 'w') as graph:
+    with open(_GRAPH_DIR + 'avg_change_in_rank.png', 'w') as graph:
         plt.savefig(graph, format='png')
+    with open(_GRAPH_DIR + 'avg_change_in_rank.eps', 'w') as graph:
+        plt.savefig(graph, format='eps')        
     print ('Outputted Graph: Average Change in Rank from Time Period to '
            'True Count')
     plt.close()
@@ -180,8 +200,10 @@ def draw_big_changes_graph(big_rank_changes, max_y):
                 % int(100 * _BIG_CHANGE_THRESHOLD_PERCENTAGE)))
     plt.title('Number of Large Rank Changes between Time Period and True Count')
 
-    with open('num_big_changes_in_rank.png', 'w') as graph:
+    with open(_GRAPH_DIR + 'num_big_changes_in_rank.png', 'w') as graph:
         plt.savefig(graph, format='png')
+    with open(_GRAPH_DIR + 'num_big_changes_in_rank.eps', 'w') as graph:
+        plt.savefig(graph, format='eps')        
     print ('Outputted Graph: Number of Large Rank Changes between Time Period '
            'and True Count')
     plt.close()
@@ -221,8 +243,10 @@ def draw_stability_graph(stabilities, max_y):
     plt.ylabel('percentage still in top X%')
     plt.title('Stability of Top X% Between Time Period and True Count')
 
-    with open('stability.png', 'w') as graph:
+    with open(_GRAPH_DIR + 'stability.png', 'w') as graph:
         plt.savefig(graph, format='png')
+    with open(_GRAPH_DIR + 'stability.eps', 'w') as graph:
+            plt.savefig(graph, format='eps')        
     print('Outputted Graph: Stability of Top X% Between Time Period '
           'and True Count')
     plt.close()

@@ -1,9 +1,3 @@
-__author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
-
-RELATIVE_PATH_TO_DATA = '../MarketDecision/'
-FILE_TEMPLATE = 'MarketDecision_%s_hrs.txt'
-TRUE_COUNT_FILE = 'MarketDecision_true_count.txt'
-
 """
 This module contains utility functions useful in analysis of Market Decisions
 data.
@@ -16,7 +10,17 @@ TRUE_COUNT_FILE -- The name of the true count file.
 Functions:
 load_true_ranks -- Loads the true counts from disk into memory.
 pad_time_period -- Returns 3 char string representation of an int.
+
+__author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 """
+
+import Configuration
+config = Configuration.getConfig()
+_data_dir = config.get("Path", "base-dir") + config.get("Path", "data-dir")
+FULL_PATH_TO_DATA = _data_dir + \
+    config.get("aMarketDecision", "relative-path-to-data") 
+FILE_TEMPLATE = config.get("aMarketDecision", "data-file-template")
+TRUE_COUNT_FILE = FULL_PATH_TO_DATA + config.get("aMarketDecision", "groud-truth-file")
 
 def load_true_ranks():
     """Loads the true ranks from disk.
@@ -27,7 +31,7 @@ def load_true_ranks():
     Returns:
     true_ranks -- A Dictionary with urls mapped to their ranks
     """
-    true_count_file_path = RELATIVE_PATH_TO_DATA + TRUE_COUNT_FILE
+    true_count_file_path = TRUE_COUNT_FILE
 
     true_ranks = {}
 
