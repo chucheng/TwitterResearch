@@ -19,6 +19,8 @@ def getConfig():
     hostname = socket.gethostname()
     if hostname == "chucheng-410s":
         project_base_dir = "/home/chucheng/Projects/github/TwitterResearch/"
+    elif hostname == "Shahinshah.local":
+        project_base_dir = "/Users/cmoghbel/Code/TwitterResearch/"
     else:
         log("Error: hostname unknown - " + hostname)
         return None
