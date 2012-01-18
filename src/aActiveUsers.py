@@ -1,3 +1,34 @@
+"""
+This module performs an analysis on active and inactive users. It attempts to
+shed more light on which users are active vs inactive, and help set a boundary
+condition for determining active vs. inactive users. It outputs three things:
+
+    1. The first graph examines the average number of tweets for users per month
+       in each percentile.
+    2. The second graph examines the percentage change in avg number of tweets
+       for users per month for each percentile.
+    3. The third item is a tsv file that contains the top 100 active users, in
+       descending order.
+
+For more information, see:
+http://cedar.cs.ucla.edu/wiki/index.php/Identify_Experts
+
+Functions:
+calculate_avg_changes_in_activity -- Calculates the avg changes in activity for
+                                     the second graph.
+calculate_avg_num_tweets -- Calculates the average numner of tweets per month.
+calculate_avg_num_tweets_per_user -- Calculates the avg number of tweets per
+                                     month for a given time span for each user.
+calculate_user_percentile -- Calculates the percentile to which each user
+                             belonds.
+draw_active_users_graph -- Draws the active users graph (graph #1).
+draw_percentage_change_graph -- Draws the percentage change graph (graph #2).
+gather_tweet_counts -- Parses total tweet counts per users from data files.
+output_top_users -- Outputs the top 100 users to tsv file in descending order.
+run -- Main logic.
+
+__author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
+"""
 import os
 
 import Configuration
@@ -70,11 +101,88 @@ def calculate_avg_num_tweets(user_id_sorted_by_tweet_count):
   return avg_num_tweets
 
 
+def calculate_avg_num_tweets_per_user(id_to_count, num_months):
+  """Calculates the average number of tweets for all users over a time span.
+
+  Keyword Arguments:
+  id_to_count -- A dictionary mapping user id's to a number of tweets for a time
+                 span.
+  num_months -- The number of months of the time span.
+
+  Returns:
+  id_to_avg -- A dictionary mapping user id to avg number of tweets per month.
+  """
+  id_to_avg = {}
+  for user_id, num_tweets in id_to_count.items():
+    id_to_avg[user_id] = num_tweets / (num_months * 1.0)
+  return id_to_avg
+
+
+def calculate_avg_change_in_activity(id_to_avg_training, id_to_avg_testing,
+                                     id_to_percentile):
+  """Calculates the avg change in activity for each percentile.
+
+  Keyword Arguments:
+  id_to_avg_training -- A dictionary mapping user id's to average number tweets
+                        during the training set.
+  id_to_avg_testing -- A dictionary mapping user id's to average number tweets
+                       during the testing set.
+  id_to_percentile -- A dictionary mapping user id's to the percentile to which
+                      they belong.
+
+  Returns:
+  avg_change -- A list of avg_changes in decreasing order of percentile.
+                (ie 1st value is for 1%, 2nd value for 2nd %, etc.)
+  """
+  avg_change = [0 for i in range(100)]
+  num_users_for_percentile = [0 for i in range(100)]
+  for user_id, percentile in id_to_percentile.items():
+    if (id_to_avg_testing.has_key(user_id)
+    and id_to_avg_training.has_key(user_id)):
+      x = id_to_avg_training.get(user_id)
+      y = id_to_avg_testing.get(user_id)
+      change = abs(y - x) / (x * 1.0)
+      # Subtract 1 from percentile to use it as an index for the list.
+      avg_change[percentile - 1] += change
+      num_users_for_percentile[percentile - 1] += 1
+  
+  for i in range(100):
+    num_users = num_users_for_percentile[i]
+    if num_users > 0:
+      avg_change[i] /= num_users
+  
+  return avg_change
+
+
+def calculate_user_percentile(user_id_sorted_by_tweet_count):
+  """Calculates the percentile each user belonds to.
+
+  Keyword Arguments:
+  user_id_sorted_by_tweet_count - A sorted list of tuples, with the
+                                  first element the user id, and the second
+                                  element the number of tweets, sorted by
+                                  number of tweets.
+
+  Returns:
+  user_id_to_percentile -- A dictionary mapping user id's to percenticles.
+  """
+  num_users = len(user_id_sorted_by_tweet_count)
+  bucket_size = num_users / 100
+  user_id_to_percentile = {}
+  current_percentile = 1
+  for i in range(num_users):
+    user_id, tweet_count = user_id_sorted_by_tweet_count[i]
+    user_id_to_percentile[user_id] = current_percentile
+    if i is not 0 and i % bucket_size is 0:
+      current_percentile += 1
+  return user_id_to_percentile
+    
+
 def draw_active_users_graph(avg_num_tweets):
   """Plots avg number of tweets per month graph using matplotlib.
 
   This graph shows the average number of tweets per month by percentile.
-  The date comes in the format of a list with 100 elements, the first being
+  The data comes in the format of a list with 100 elements, the first being
   the avg number for the top 1% of users, the second being the 2nd %, etc.
 
   Keyword Arguments:
@@ -82,8 +190,8 @@ def draw_active_users_graph(avg_num_tweets):
   """
   figure = plt.figure()
   ax = figure.add_subplot(111)
-  myplt = ax.plot(avg_num_tweets)
-  plt.axis([1, 101, 0, avg_num_tweets[0]])
+  myplt = ax.plot([i for i in range(1, 101)], avg_num_tweets)
+  plt.axis([0, 101, 0, avg_num_tweets[0] + 1])
   plt.grid(True, which='major', linewidth=2)
   ax.xaxis.set_minor_locator(MultipleLocator(5))
   ax.yaxis.set_minor_locator(MultipleLocator(5))
@@ -97,7 +205,39 @@ def draw_active_users_graph(avg_num_tweets):
   with open(_GRAPH_DIR + 'num_avg_tweets.eps', 'w') as graph:
     plt.savefig(graph, format='eps')
 
-  print 'Outputted graph: Average Numer Tweets per Month by Percentile'
+  print 'Outputted graph: Average Number Tweets per Month by Percentile'
+
+
+def draw_percentage_change_graph(avg_change):
+  """Plots avg percentage change graph using matplotlib.
+
+  This graph shows the average percentage change in avg numner of tweets per
+  user by percentile.
+
+  The data comes in the format of a list with 100 elements, the first being
+  the avg change for the top 1% of users, the second being the 2nd %, etc.
+
+  Keyword Arguments:
+  avg_num_tweets -- The data for this graph, as described above.
+  """
+  figure = plt.figure()
+  ax = figure.add_subplot(111)
+  myplt = ax.plot([i for i in range(1, 101)], avg_change)
+  plt.axis([0, 101, 0, avg_change[0] + .25])
+  plt.grid(True, which='major', linewidth=2)
+  ax.xaxis.set_minor_locator(MultipleLocator(5))
+  ax.yaxis.set_minor_locator(MultipleLocator(.25))
+  plt.grid(True, which='minor')
+  plt.xlabel('percentile')
+  plt.ylabel('Average Percentage Change')
+  plt.title('Average Percentage Change in Activity by Percentile')
+
+  with open(_GRAPH_DIR + 'percentage_change.png', 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + 'percentage_change.eps', 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  print 'Outputted Graph: Average Percentage Change in Activity by Percentile'  
 
 
 def gather_tweet_counts():
@@ -105,13 +245,21 @@ def gather_tweet_counts():
 
   This function looks at the tweet files over the period of
   the month in question, and returns a dictionary of user id
-  to number of tweets.
+  to number of tweets. It also returns a similiar dictionary
+  for both a training set and a testing set. The training set is defined
+  as the first two months, with the testing set being the second two months.
 
   Returns:
   user_id_to_tweet_count -- A dictionary mapping user id's to tweet
                             count.
+  id_to_count_training -- A dictionary mapping user id's to tweet count for the
+                          training set.
+  id_to_count_testing -- A dictionary mapping user id's to tweet count for the
+                         testing set.
   """
   user_id_to_tweet_count = {}
+  id_to_count_training = {}
+  id_to_count_testing = {}
   for month in _MONTHS:
     print 'Parsing %s/%s' %(month, _YEAR)
     training_dir = '%s/%s_%s' %(_DATA_DIR, _YEAR, month)
@@ -126,8 +274,18 @@ def gather_tweet_counts():
               user_id_to_tweet_count[user_id] += 1
             else:
               user_id_to_tweet_count[user_id] = 1
+            if month is _MONTHS[0] or month is _MONTHS[1]:
+              if id_to_count_training.has_key(user_id):
+                id_to_count_training[user_id] += 1
+              else:
+                id_to_count_training[user_id] = 1
+            else:
+              if id_to_count_testing.has_key(user_id):
+                id_to_count_testing[user_id] += 1
+              else:
+                id_to_count_testing[user_id] = 1
 
-  return user_id_to_tweet_count
+  return user_id_to_tweet_count, id_to_count_training, id_to_count_testing
 
 
 def output_top_users(user_id_sorted_by_tweet_count):
@@ -155,8 +313,11 @@ def run():
   3. Outputs the top X number of users to disk.
   4. Caclulates the average number of tweets per month for each percent.
   5. Outputs this avg number by percent in graph form.
+  6. Calculates the avg change between testing and training for each percentile.
+  7. Outputs this avg change by percentile in graph form.
   """
-  user_id_to_tweet_count = gather_tweet_counts()
+  (user_id_to_tweet_count, id_to_count_testing,
+                           id_to_count_training) = gather_tweet_counts()
 
   user_id_sorted_by_tweet_count = sorted(user_id_to_tweet_count.items(),
                                          key=lambda x: x[1], reverse=True)
@@ -166,7 +327,19 @@ def run():
   avg_num_tweets = calculate_avg_num_tweets(user_id_sorted_by_tweet_count)
 
   draw_active_users_graph(avg_num_tweets)
-
+  
+  id_to_avg_training = calculate_avg_num_tweets_per_user(id_to_count_training,
+                                                         len(_MONTHS) / 2)
+  id_to_avg_testing = calculate_avg_num_tweets_per_user(id_to_count_testing,
+                                                        len(_MONTHS) / 2)
+  id_to_percentile = calculate_user_percentile(user_id_sorted_by_tweet_count)
+  
+  avg_changes = calculate_avg_change_in_activity(id_to_avg_training,
+                                                id_to_avg_testing,
+                                                id_to_percentile)
+  
+  draw_percentage_change_graph(avg_changes)
+  
 
 if __name__ == "__main__":
     run()
