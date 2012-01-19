@@ -284,7 +284,8 @@ def gather_tweet_counts():
                 id_to_count_testing[user_id] += 1
               else:
                 id_to_count_testing[user_id] = 1
-
+                
+  print "Size of users (total): " + str(len(user_id_to_tweet_count.keys()))
   return user_id_to_tweet_count, id_to_count_training, id_to_count_testing
 
 
