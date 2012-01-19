@@ -17,8 +17,6 @@ Functions:
 calculate_avg_changes_in_activity -- Calculates the avg changes in activity for
                                      the second graph.
 calculate_avg_num_tweets -- Calculates the average numner of tweets per month.
-calculate_avg_num_tweets_per_user -- Calculates the avg number of tweets per
-                                     month for a given time span for each user.
 calculate_user_percentile -- Calculates the percentile to which each user
                              belonds.
 draw_active_users_graph -- Draws the active users graph (graph #1).
@@ -101,32 +99,15 @@ def calculate_avg_num_tweets(user_id_sorted_by_tweet_count):
   return avg_num_tweets
 
 
-def calculate_avg_num_tweets_per_user(id_to_count, num_months):
-  """Calculates the average number of tweets for all users over a time span.
-
-  Keyword Arguments:
-  id_to_count -- A dictionary mapping user id's to a number of tweets for a time
-                 span.
-  num_months -- The number of months of the time span.
-
-  Returns:
-  id_to_avg -- A dictionary mapping user id to avg number of tweets per month.
-  """
-  id_to_avg = {}
-  for user_id, num_tweets in id_to_count.items():
-    id_to_avg[user_id] = num_tweets / (num_months * 1.0)
-  return id_to_avg
-
-
-def calculate_avg_change_in_activity(id_to_avg_training, id_to_avg_testing,
+def calculate_avg_change_in_activity(id_to_count_training, id_to_count_testing,
                                      id_to_percentile):
   """Calculates the avg change in activity for each percentile.
 
   Keyword Arguments:
-  id_to_avg_training -- A dictionary mapping user id's to average number tweets
-                        during the training set.
-  id_to_avg_testing -- A dictionary mapping user id's to average number tweets
-                       during the testing set.
+  id_to_count_training -- A dictionary mapping user id's to total number tweets
+                          during the training set.
+  id_to_count_testing -- A dictionary mapping user id's to total number tweets
+                         during the testing set.
   id_to_percentile -- A dictionary mapping user id's to the percentile to which
                       they belong.
 
@@ -134,22 +115,30 @@ def calculate_avg_change_in_activity(id_to_avg_training, id_to_avg_testing,
   avg_change -- A list of avg_changes in decreasing order of percentile.
                 (ie 1st value is for 1%, 2nd value for 2nd %, etc.)
   """
+  num_tweets_training = [0 for i in range(100)]
+  num_tweets_testing = [0 for i in range(100)]
+  num_users_training = [0 for i in range(100)]
+  num_users_testing = [0 for i in range(100)]
   avg_change = [0 for i in range(100)]
-  num_users_for_percentile = [0 for i in range(100)]
+
   for user_id, percentile in id_to_percentile.items():
-    if (id_to_avg_testing.has_key(user_id)
-    and id_to_avg_training.has_key(user_id)):
-      x = id_to_avg_training.get(user_id)
-      y = id_to_avg_testing.get(user_id)
-      change = abs(y - x) / (x * 1.0)
-      # Subtract 1 from percentile to use it as an index for the list.
-      avg_change[percentile - 1] += change
-      num_users_for_percentile[percentile - 1] += 1
-  
+    if id_to_count_training.has_key(user_id):
+      num_tweets_training[percentile - 1] += id_to_count_training.get(user_id)
+      num_users_training[percentile - 1] += 1
+    if id_to_count_testing.has_key(user_id):
+      num_tweets_testing[percentile - 1] += id_to_count_testing.get(user_id)
+      num_users_testing[percentile - 1] += 1
+
   for i in range(100):
-    num_users = num_users_for_percentile[i]
-    if num_users > 0:
-      avg_change[i] /= num_users
+    num_tweets_training[i] /= (num_users_training[i] * 1.0)
+    num_tweets_testing[i] /= (num_users_testing[i] * 1.0)
+    num_tweets_training[i] /= (len(_MONTHS) * 1.0)
+    num_tweets_testing[i] /= (len(_MONTHS) * 1.0) 
+
+    x = num_tweets_training[i] 
+    y = num_tweets_testing[i] 
+    change = (abs(y - x) / (x * 1.0)) * 100
+    avg_change[i] = change
   
   return avg_change
 
@@ -174,7 +163,11 @@ def calculate_user_percentile(user_id_sorted_by_tweet_count):
     user_id, tweet_count = user_id_sorted_by_tweet_count[i]
     user_id_to_percentile[user_id] = current_percentile
     if i is not 0 and i % bucket_size is 0:
-      current_percentile += 1
+      # Dont increase percentile past 100. We need to do this because we need
+      # bucket size to be a integer, but to have 100 even buckets we would need
+      # decimal bucket sizes. This takes care of this "rounding issue".
+      if current_percentile < 100:
+        current_percentile += 1
   return user_id_to_percentile
     
 
@@ -226,7 +219,7 @@ def draw_percentage_change_graph(avg_change):
   plt.axis([0, 101, 0, avg_change[0] + .25])
   plt.grid(True, which='major', linewidth=2)
   ax.xaxis.set_minor_locator(MultipleLocator(5))
-  ax.yaxis.set_minor_locator(MultipleLocator(.25))
+  ax.yaxis.set_minor_locator(MultipleLocator(1))
   plt.grid(True, which='minor')
   plt.xlabel('percentile')
   plt.ylabel('Average Percentage Change')
@@ -264,7 +257,7 @@ def gather_tweet_counts():
     print 'Parsing %s/%s' %(month, _YEAR)
     training_dir = '%s/%s_%s' %(_DATA_DIR, _YEAR, month)
     for filename in os.listdir(training_dir):
-      if '.tweet' in filename:
+      if '.tweet' in filename and 'http_nyti_ms' in filename:
         data_file = '%s/%s' %(training_dir, filename)
         with open(data_file) as f:
           for line in f:
@@ -328,15 +321,11 @@ def run():
 
   draw_active_users_graph(avg_num_tweets)
   
-  id_to_avg_training = calculate_avg_num_tweets_per_user(id_to_count_training,
-                                                         len(_MONTHS) / 2)
-  id_to_avg_testing = calculate_avg_num_tweets_per_user(id_to_count_testing,
-                                                        len(_MONTHS) / 2)
   id_to_percentile = calculate_user_percentile(user_id_sorted_by_tweet_count)
   
-  avg_changes = calculate_avg_change_in_activity(id_to_avg_training,
-                                                id_to_avg_testing,
-                                                id_to_percentile)
+  avg_changes = calculate_avg_change_in_activity(id_to_count_training,
+                                                 id_to_count_testing,
+                                                 id_to_percentile)
   
   draw_percentage_change_graph(avg_changes)
   
