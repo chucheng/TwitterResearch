@@ -1,160 +1,93 @@
+import Configuration
 import DataUtils
+import Util
 
+import matplotlib
+matplotlib.use("Agg")
+
+from matplotlib.ticker import MultipleLocator
+import matplotlib.pyplot as plt
+import matplotlib.axis
+
+import os
 from datetime import datetime 
+from math import sqrt
 
 
-def calculate_hit_miss_rate(ground_truth_rankings, other_rankings):
-  """Calculate the hit and miss rate for a set of rankings against ground truth.
+_GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
+
+
+def calculate_diff_avg(ground_truth_url_to_rank, other_rank_to_url):
+  max_num_news_to_consider = int(len(ground_truth_url_to_rank.keys()) * .02)
+  avg_diffs = []
+  for i in range(1, max_num_news_to_consider + 1):
+    diff_sum = 0
+    for j in range(1, i + 1):
+      other_rank = j
+      url = other_rank_to_url[j]
+      gt_rank = ground_truth_url_to_rank[url]
+      diff = (other_rank - gt_rank)**2 
+      diff_sum += diff
+    diff_avg = sqrt(diff_sum) / i
+    avg_diffs.append(diff_avg)
   
-  Hit rate is defined as the percentage of urls from the top X urls of the ground
-  truth rankings that appear in the top X urls of the other rankings.
-  
-  Consequently, miss rate is defined as the percentage of urls from the top X
-  urls of the ground truths that do not appear in the top X urls of the other
-  rankings.
-  
-  Keyword Arguments:
-  ground_truth_rankings -- A list of (url, count) pairs, in ranked
-  (sorted by count) order, representing the ground truth.
-  other_rankings -- A list of (url, count) pairs, in ranked (sorted by count)
-  order, representing the other set of rankings.
-  
-  Returns:
-  hit_rate -- The hit rate as a percentage.
-  miss_rate -- The miss rate as a percentage.
-  """
-  num_news_to_consider = int(len(ground_truth_rankings) * .02)
-  hit_rate = 0
-  miss_rate = 0
-  other_rankings_set = set()
-  for i in range(num_news_to_consider):
-    url, count = other_rankings[i]
-    other_rankings_set.add(url)
-  for i in range(num_news_to_consider):
-    url, count = ground_truth_rankings[i]
-    if url in other_rankings_set:
-      hit_rate +=1
-    else:
-      miss_rate += 1
-  hit_rate = (hit_rate/float(num_news_to_consider)) * 100.0
-  miss_rate = (miss_rate/float(num_news_to_consider)) * 100.0 
-  return hit_rate, miss_rate
+  return avg_diffs
 
 
-def calculate_mean_and_variance(ground_truth_rankings, other_rankings):
-  """Calculates the mean and variance of the top X ranked urls.
+def draw_graph(expert_diffs, active_diffs, common_diffs):
+  plots = []
+  figure = plt.figure()
+  ax = figure.add_subplot(111)
 
-  Keyword Arguments:
-  ground_truth_rankings -- A list of (url, count) pairs, in ranked
-  (sorted by count) order, representing the ground truth.
-  other_rankings -- A list of (url, count) pairs, in ranked (sorted by count)
-  order, representing the other set of rankings.
-  
-  Returns:
-  mean -- The mean, defined as the average ground truth ranking of the
-  top X urls, as ranked in the other rankings set.
-  var -- The var, defined as the sum of the differences of ranks 1...100
-  from the mean squared.
-  """
-  num_news_to_consider = int(len(ground_truth_rankings) * .02)
-  mean = 0
-  for i in range(num_news_to_consider):
-    url, count = other_rankings[i]
-    for j, (gt_url, count) in enumerate(ground_truth_rankings):
-      if gt_url == url:
-        mean += j
-        break
-  mean /= float(num_news_to_consider)
-  var = 0
-  for i in range(num_news_to_consider):
-    var += ((i+1) - mean)**2
-  var /= float(num_news_to_consider)
-  return mean, var
+  expert_plot = ax.plot([i for i in range(1, len(expert_diffs) + 1)], expert_diffs)
+  plots.append(expert_plot)
 
+  active_plot = ax.plot([i for i in range(1, len(active_diffs) + 1)], active_diffs)
+  plots.append(active_plot)
 
-def calculate_mean_and_variance_missing(ground_truth_rankings, other_rankings):
-  """Calculates the mean and variance of any 'missing' urls from the top X urls.
-  
-  Keyword Arguments:
-    ground_truth_rankings -- A list of (url, count) pairs, in ranked
-    (sorted by count) order, representing the ground truth.
-    other_rankings -- A list of (url, count) pairs, in ranked (sorted by count)
-    order, representing the other set of rankings.
-    
-  Returns:
-  mean -- The mean, defined as the average ground truth ranking urls from the
-  top X urls of the other rankings that don't appear in the top X of the ground
-  truth rankings.
-  var -- The var, defined as the sum of the differences of the missing ranks
-  from the mean squared.
-  """
-  num_news_to_consider = int(len(ground_truth_rankings) * .02)
-  mean = 0
-  gt_top_urls = set()
-  for i in range(num_news_to_consider):
-    url, count = ground_truth_rankings[i]
-    gt_top_urls.add(url)
-  ranks_of_urls_not_in_top = []
-  for i in range(num_news_to_consider):
-    url, count = other_rankings[i]
-    if not url in gt_top_urls:
-      for j, (gt_url, count) in enumerate(ground_truth_rankings):
-        if gt_url == url:
-          mean += j
-          ranks_of_urls_not_in_top.append(j)
-          break
-  mean /= float(len(ranks_of_urls_not_in_top))
-  var = 0
-  for rank in ranks_of_urls_not_in_top:
-    var += (rank - mean)**2
-  var /= float(len(ranks_of_urls_not_in_top))
-  return mean, var
+  common_plot = ax.plot([i for i in range(1, len(common_diffs) + 1)], common_diffs)
+  plots.append(common_plot)
+
+  plt.legend(plots, ['Experts', 'Active Users', 'Common Users'])
+
+  plt.axis([1, len(expert_diffs) + 1, 0, 20])
+  plt.grid(True, which='major', linewidth=1)
+
+  ax.xaxis.set_minor_locator(MultipleLocator(50))
+  ax.yaxis.set_minor_locator(MultipleLocator(1))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Top X Stories Compared')
+  plt.ylabel('Average Differnce in Ranking')
+  plt.title('Ranking Performance by User Group')
+
+  with open(_GRAPH_DIR + 'ranking_performance.png', 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + 'ranking_performance.eps', 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  print 'Outputted graph: Ranking Performance by User Group'
+  plt.close()
   
 
-def get_ground_truths(cache):
-  """Gets the ground truth counts and rankings for urls.
-
-  To determine the ground truth, we do the following:
-    1. Find all news appearing in months 09, 10, 11
-    2. Exclude all news appearing in 08
-    3. Find the true counts by summing tweets from 09, 10, 11, 12
-
-  Keyword Arguments:
-  cache -- A dictionary mapping short urls to long urls.
-
-  Returns:
-  ground_truths -- A dictionary of url to ground_truth tweet counts.
-  """
-  ground_truths = DataUtils.gather_tweet_counts_for(['09', '10', '11'], cache)
-  DataUtils.eliminate_news_for(['08'], ground_truths, cache)
-  DataUtils.add_tweets_from(['12'], ground_truths, cache)
-  return ground_truths
-  
-
-def get_rankings_for_groups(cache, experts, active_users):
-  """Determines the rankings for the Expert, Active, and Common users.
-  
-  Keyword Arguments:
-  cache -- A dictionary mapping short urls to long urls.
-  experts -- A python set of user ids representing 'expert' users.
-  active_users -- A python set of user ids representing 'active' users.
-  
-  Returns:
-  expert_rankings -- A list of (url, count) pairs in ranked (sorted by count)
-  order, as determined by expert users.
-  active_rankings -- A list of (url, count) pairs in ranked (sorted by count)
-  order, as determined by active users.
-  common_rankings -- A list of (url, count) pairs in ranked (sorted by count)
-  order, as determined by common users.
-  """
-  etc, atc, ctc = DataUtils.gather_tweet_counts_for_groups(['09', '10', '11'], cache, experts, active_users)
+def get_rankings(cache, experts, active_users):
+  gtc, etc, atc, ctc = DataUtils.gather_tweet_counts(['09', '10', '11'], cache, experts, active_users)
+  DataUtils.eliminate_news(['08'], gtc, cache)
+  DataUtils.eliminate_news(['08'], etc, cache)
+  DataUtils.eliminate_news(['08'], atc, cache)
+  DataUtils.eliminate_news(['08'], ctc, cache)
+  DataUtils.add_tweet_counts(['12'], gtc, cache)
+  DataUtils.add_tweet_counts(['12'], etc, cache)
+  DataUtils.add_tweet_counts(['12'], atc, cache)
+  DataUtils.add_tweet_counts(['12'], ctc, cache)
+  gt_rankings = sorted(gtc.items(), key=lambda x: x[1], reverse=True)
   expert_rankings = sorted(etc.items(), key=lambda x: x[1], reverse=True)
   active_rankings = sorted(atc.items(), key=lambda x: x[1], reverse=True)
   common_rankings = sorted(ctc.items(), key=lambda x: x[1], reverse=True)
-  return expert_rankings, active_rankings, common_rankings
+  return gt_rankings, expert_rankings, active_rankings, common_rankings
 
 
-def group_users(user_id_sorted_by_tweet_count):
+def group_users():
   """Groups users into 'expert', 'active', and 'common' categories.
   
   Keyword Arguments:
@@ -169,6 +102,7 @@ def group_users(user_id_sorted_by_tweet_count):
   common_users -- A python set of user ids for common users, defined as users
   whose rank is lower the 25% as ranked by activity.
   """
+  user_id_sorted_by_tweet_count = DataUtils.get_users_sorted_by_tweet_count(['09', '10', '11'])
   num_users = len(user_id_sorted_by_tweet_count)
   bucket_size = num_users / 100
   
@@ -208,22 +142,33 @@ def run():
   6. Compare these rankings against the ground truth rankings.
   """
   cache = DataUtils.load_cache()
-  ground_truths = get_ground_truths(cache)
-  log('Number of news stories (total): %s' % len(ground_truths.keys()))
-  user_ids_sorted = DataUtils.get_users_sorted_by_tweet_count(['09', '10', '11'])
-  experts, active_users, common_users = group_users(user_ids_sorted)
+
+  experts, active_users, common_users = group_users()
   log('Num experts: %s' % len(experts))
   log('Num active: %s' % len(active_users))
   log('Num common: %s' % len(common_users))
-  expert_rankings, active_rankings, common_rankings = get_rankings_for_groups(cache, experts, active_users)
+
+  gt_rankings, expert_rankings, active_rankings, common_rankings = get_rankings(cache, experts, active_users)
+  log('Num ground_truth_rankings: %s' % len(gt_rankings))
+  num_votes_experts = 0
+  for url, count in expert_rankings:
+    num_votes_experts += count
   log('Num expert rankings: %s' % len(expert_rankings))
+  log('Num expert votes: %s' % num_votes_experts)
+  num_votes_active = 0
+  for url, count in active_rankings:
+    num_votes_active += count
   log('Num active_rankings: %s' % len(active_rankings))
+  log('Num active votes: %s' % num_votes_active)
+  num_votes_common = 0
+  for url, count in common_rankings:
+    num_votes_common += count
   log('Num common_rankings: %s' % len(common_rankings))
-  sorted_ground_truths = sorted(ground_truths.items(), key=lambda x: x[1], reverse=True)
-  log('Num ground_truth_rankings: %s' % len(sorted_ground_truths))
+  log('Num common votes: %s' % num_votes_common)
+
   log('Ground Truth Top 10')
   for i in range(10):
-    url, count = sorted_ground_truths[i]
+    url, count = gt_rankings[i]
     log('[%s] %s\t%s' %(i, url, count))
   log('-----------------------------------')
   log('Expert Top 10')
@@ -241,41 +186,23 @@ def run():
     url, count = common_rankings[i]
     log('[%s] %s\t%s' %(i, url, count))
     
-  hit_rate_experts, miss_rate_experts = calculate_hit_miss_rate(sorted_ground_truths, expert_rankings)
-  hit_rate_active, miss_rate_active = calculate_hit_miss_rate(sorted_ground_truths, active_rankings)
-  hit_rate_common, miss_rate_common = calculate_hit_miss_rate(sorted_ground_truths, common_rankings)
-  
-  log('')
-  log('Expert Hit Rate: %s' % hit_rate_experts)
-  log('Expert Miss Rate: %s' % miss_rate_experts)
-  log('Active Hit Rate: %s' % hit_rate_active)
-  log('Active Miss Rate: %s' % miss_rate_active)
-  log('Common Hit Rate: %s' % hit_rate_common)
-  log('Common Miss Rate: %s' % miss_rate_common)
-  
-  mean_experts, var_experts = calculate_mean_and_variance(sorted_ground_truths, expert_rankings)
-  mean_active, var_active = calculate_mean_and_variance(sorted_ground_truths, active_rankings)
-  mean_common, var_common = calculate_mean_and_variance(sorted_ground_truths, common_rankings)
-  
-  log('')
-  log('Expert Mean: %s' % mean_experts)
-  log('Expert Var: %s' % var_experts)
-  log('Active Mean: %s' % mean_active)
-  log('Active Var: %s' % var_active)
-  log('Common Mean: %s' % mean_common)
-  log('Common Var: %s' % var_common)
-  
-  mean_missing_experts, var_missing_experts = calculate_mean_and_variance_missing(sorted_ground_truths, expert_rankings)
-  mean_missing_active, var_missing_active = calculate_mean_and_variance_missing(sorted_ground_truths, active_rankings)
-  mean_missing_common, var_missing_common = calculate_mean_and_variance_missing(sorted_ground_truths, common_rankings)
+  ground_truth_url_to_rank = {}
+  for rank, (url, count) in enumerate(gt_rankings):
+    ground_truth_url_to_rank[url] = rank
+  experts_rank_to_url = {}
+  active_rank_to_url = {}
+  common_rank_to_url = {}
+  for rank, (url, count) in enumerate(expert_rankings):
+    experts_rank_to_url[rank] = url
+  for rank, (url, count) in enumerate(active_rankings):
+    active_rank_to_url[rank] = url
+  for rank, (url, count) in enumerate(common_rankings):
+    common_rank_to_url[rank] = url
+  avg_diffs_expert = calculate_diff_avg(ground_truth_url_to_rank, experts_rank_to_url)
+  avg_diffs_active = calculate_diff_avg(ground_truth_url_to_rank, active_rank_to_url)
+  avg_diffs_common = calculate_diff_avg(ground_truth_url_to_rank, common_rank_to_url)
 
-  log('')  
-  log('Expert Missing Mean: %s' % mean_missing_experts)
-  log('Expert Missing Var: %s' % var_missing_experts)
-  log('Active Missing Mean: %s' % mean_missing_active)
-  log('Active Missing Var: %s' % var_missing_active)
-  log('Common Missing Mean: %s' % mean_missing_common)
-  log('Common Missing Var: %s' % var_missing_common)  
+  draw_graph(avg_diffs_expert, avg_diffs_active, avg_diffs_common)
 
 
 def log(message):

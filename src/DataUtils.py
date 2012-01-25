@@ -20,7 +20,7 @@ _CACHE_FILENAME = '/dfs/birch/tsv/URLExapnd.cache.txt'
 _YEAR = '2011'
 
 
-def add_tweets_from(months, tweet_counts, cache):
+def add_tweet_counts(months, tweet_counts, cache):
   for month in months:
     log('Adding tweets for exisiting news from %s/%s' %(month, _YEAR))
     dir_name = get_data_dir_name_for(month) 
@@ -37,7 +37,7 @@ def add_tweets_from(months, tweet_counts, cache):
                 tweet_counts[url] += 1
 
 
-def eliminate_news_for(months, tweet_counts, cache):
+def eliminate_news(months, tweet_counts, cache):
   for month in months:
     log('Removing news stories seen in %s/%s' %(month, _YEAR))
     dir_name = get_data_dir_name_for(month) 
@@ -52,31 +52,10 @@ def eliminate_news_for(months, tweet_counts, cache):
             for url in urls:
               if url in tweet_counts:
                 del tweet_counts[url]
-                
-
-def gather_tweet_counts_for(months, cache):
-  tweet_counts = {}
-  for month in months:
-    log('Loading news stories for %s/%s' %(month, _YEAR))
-    dir_name = get_data_dir_name_for(month) 
-    for filename in os.listdir(dir_name):
-      if '.tweet' in filename and 'http_nyti_ms' in filename:
-        data_file = '%s/%s' %(dir_name, filename)
-        with open(data_file) as f:
-          for line in f:
-            tokens = line.split('\t')
-            tweet_text = tokens[_TWEETFILE_TWEET_TEXT_INDEX]
-            urls = URLUtil.parse_urls(tweet_text, cache)
-            for url in urls:
-              if url in tweet_counts:
-                tweet_counts[url] += 1
-              else:
-                tweet_counts[url] = 1                
-                
-  return tweet_counts
 
 
-def gather_tweet_counts_for_groups(months, cache, experts, active):
+def gather_tweet_counts(months, cache, experts, active):
+  gt_tweet_counts = {}
   expert_tweet_counts = {}
   active_tweet_counts = {}
   common_tweet_counts = {}
@@ -93,6 +72,11 @@ def gather_tweet_counts_for_groups(months, cache, experts, active):
             urls = URLUtil.parse_urls(tweet_text, cache)
             user_id = tokens[_TWEETFILE_USER_ID_INDEX]
             for url in urls:
+              if url in gt_tweet_counts:
+                gt_tweet_counts[url] += 1
+              else:
+                gt_tweet_counts[url] = 1
+
               if user_id in experts:
                 if url in expert_tweet_counts:
                   expert_tweet_counts[url] += 1
@@ -109,7 +93,7 @@ def gather_tweet_counts_for_groups(months, cache, experts, active):
                 else:
                   common_tweet_counts[url] = 1                
                 
-  return expert_tweet_counts, active_tweet_counts, common_tweet_counts
+  return gt_tweet_counts, expert_tweet_counts, active_tweet_counts, common_tweet_counts
 
 
 def get_data_dir_name_for(month):
