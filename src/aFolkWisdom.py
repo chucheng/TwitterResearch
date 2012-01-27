@@ -18,6 +18,7 @@ at which they tweet.
 __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 """
 import DataUtils
+import FileLog
 import Util
 
 import matplotlib
@@ -28,10 +29,13 @@ import matplotlib.pyplot as plt
 import matplotlib.axis
 
 from datetime import datetime 
+import math
 from math import sqrt
 
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
+_LOG_FILE = 'aFolkWisdom.log'
+_DELTAS = [1, 4, 8]
 
 
 def calculate_diff_avg(ground_truth_url_to_rank, other_rank_to_url):
@@ -60,7 +64,7 @@ def calculate_diff_avg(ground_truth_url_to_rank, other_rank_to_url):
   return avg_diffs
 
 
-def draw_graph(expert_diffs, active_diffs, common_diffs):
+def draw_graph(expert_diffs, market_diffs, active_diffs, common_diffs, delta):
   """Draws the graph for avg diffs.
   
   Keyword Arguments:
@@ -71,6 +75,10 @@ def draw_graph(expert_diffs, active_diffs, common_diffs):
   plots = []
   figure = plt.figure()
   ax = figure.add_subplot(111)
+
+  market_plot = ax.plot([i for i in range(1, len(market_diffs) + 1)],
+                        market_diffs)
+  plots.append(market_plot)
 
   expert_plot = ax.plot([i for i in range(1, len(expert_diffs) + 1)],
                         expert_diffs)
@@ -84,29 +92,36 @@ def draw_graph(expert_diffs, active_diffs, common_diffs):
                         common_diffs)
   plots.append(common_plot)
 
-  plt.legend(plots, ['News-aholics', 'Active Users', 'Common Users'])
+  plt.legend(plots, ['Market', 'News-aholics', 'Active Users', 'Common Users'],
+             loc=0)
 
-  plt.axis([1, len(expert_diffs) + 1, 0, 20])
+  max_y = max([max(market_diffs), max(expert_diffs), max(active_diffs),
+               max(common_diffs)])
+  plt.axis([1, len(expert_diffs) + 1, 0, max_y])
   plt.grid(True, which='major', linewidth=1)
 
-  ax.xaxis.set_minor_locator(MultipleLocator(50))
-  ax.yaxis.set_minor_locator(MultipleLocator(1))
+  ax.xaxis.set_minor_locator(MultipleLocator(100))
+  minor_locator = int(math.log(max_y))
+  if minor_locator % 2 == 1:
+    minor_locator += 1
+  ax.yaxis.set_minor_locator(MultipleLocator(minor_locator))
   plt.grid(True, which='minor')
 
   plt.xlabel('Top X Stories Compared')
   plt.ylabel('Average Differnce in Ranking')
-  plt.title('Ranking Performance by User Group')
+  plt.title('Ranking Performance by User Group with %s Hour Delta' % delta)
 
-  with open(_GRAPH_DIR + 'ranking_performance.png', 'w') as graph:
+  with open(_GRAPH_DIR + 'ranking_performance_%s.png' % delta, 'w') as graph:
     plt.savefig(graph, format='png')
-  with open(_GRAPH_DIR + 'ranking_performance.eps', 'w') as graph:
+  with open(_GRAPH_DIR + 'ranking_performance_%s.eps' % delta, 'w') as graph:
     plt.savefig(graph, format='eps')
 
-  print 'Outputted graph: Ranking Performance by User Group'
+  log('Outputted graph: Ranking Performance by User Group with %s Hour Delta'
+      % delta)
   plt.close()
   
 
-def get_rankings(cache, experts, active_users):
+def get_rankings(delta, cache, experts, active_users):
   """Gets the true rankings, and ranking returned by expert, active, and common.
   
   Keyword Arguments:
@@ -123,21 +138,23 @@ def get_rankings(cache, experts, active_users):
   common_rankings -- The rankings as given by common users, as a list of
   (url, count) pairs.
   """
-  gtc, etc, atc, ctc = DataUtils.gather_tweet_counts(['09', '10', '11'], cache,
-                                                     experts, active_users)
-  DataUtils.eliminate_news(['08'], gtc, cache)
-  DataUtils.eliminate_news(['08'], etc, cache)
-  DataUtils.eliminate_news(['08'], atc, cache)
-  DataUtils.eliminate_news(['08'], ctc, cache)
-  DataUtils.add_tweet_counts(['12'], gtc, cache)
-  DataUtils.add_tweet_counts(['12'], etc, cache)
-  DataUtils.add_tweet_counts(['12'], atc, cache)
-  DataUtils.add_tweet_counts(['12'], ctc, cache)
+  gtc, mtc, etc, atc, ctc = DataUtils.gather_tweet_counts(cache, experts,
+                                                          active_users, delta)
+  # DataUtils.eliminate_news(['08'], gtc, cache)
+  # DataUtils.eliminate_news(['08'], etc, cache)
+  # DataUtils.eliminate_news(['08'], atc, cache)
+  # DataUtils.eliminate_news(['08'], ctc, cache)
+  # DataUtils.add_tweet_counts(['12'], gtc, cache)
+  # DataUtils.add_tweet_counts(['12'], etc, cache)
+  # DataUtils.add_tweet_counts(['12'], atc, cache)
+  # DataUtils.add_tweet_counts(['12'], ctc, cache)
   gt_rankings = sorted(gtc.items(), key=lambda x: x[1], reverse=True)
+  market_rankings = sorted(mtc.items(), key=lambda x: x[1], reverse=True)
   expert_rankings = sorted(etc.items(), key=lambda x: x[1], reverse=True)
   active_rankings = sorted(atc.items(), key=lambda x: x[1], reverse=True)
   common_rankings = sorted(ctc.items(), key=lambda x: x[1], reverse=True)
-  return gt_rankings, expert_rankings, active_rankings, common_rankings
+  return (gt_rankings, market_rankings, expert_rankings, active_rankings,
+         common_rankings)
 
 
 def group_users():
@@ -155,7 +172,7 @@ def group_users():
   common_users -- A python set of user ids for common users, defined as users
   whose rank is lower the 25% as ranked by activity.
   """
-  user_id_sorted = DataUtils.get_users_sorted_by_tweet_count(['09', '10', '11'])
+  user_id_sorted = DataUtils.get_users_sorted_by_tweet_count(['08', '09', '10', '11', '12'])
   num_users = len(user_id_sorted)
   bucket_size = num_users / 100
   
@@ -191,6 +208,7 @@ def run():
   4. Compare group rankings against the ground truth rankings.
   5. Draw graph.
   """
+  FileLog.set_log_dir()
   cache = DataUtils.load_cache()
 
   experts, active_users, common_users = group_users()
@@ -198,75 +216,125 @@ def run():
   log('Num active: %s' % len(active_users))
   log('Num common: %s' % len(common_users))
 
-  (gt_rankings, expert_rankings,
-   active_rankings, common_rankings) = get_rankings(cache, experts,
-                                                    active_users)
-  log('Num ground_truth_rankings: %s' % len(gt_rankings))
-  num_votes_experts = 0
-  for url, count in expert_rankings:
-    num_votes_experts += count
-  log('Num expert rankings: %s' % len(expert_rankings))
-  log('Num expert votes: %s' % num_votes_experts)
-  num_votes_active = 0
-  for url, count in active_rankings:
-    num_votes_active += count
-  log('Num active_rankings: %s' % len(active_rankings))
-  log('Num active votes: %s' % num_votes_active)
-  num_votes_common = 0
-  for url, count in common_rankings:
-    num_votes_common += count
-  log('Num common_rankings: %s' % len(common_rankings))
-  log('Num common votes: %s' % num_votes_common)
+  for delta in _DELTAS:
+    log('Finding rankings with an %s hour delta.' % delta)
+    (gt_rankings, market_rankings, expert_rankings,
+     active_rankings, common_rankings) = get_rankings(delta, cache, experts,
+                                                      active_users)
 
-  log('Ground Truth Top 10')
-  for i in range(10):
-    url, count = gt_rankings[i]
-    log('[%s] %s\t%s' %(i, url, count))
-  log('-----------------------------------')
-  log('Expert Top 10')
-  for i in range(10):
-    url, count = expert_rankings[i]
-    log('[%s] %s\t%s' %(i, url, count))
-  log('-----------------------------------')
-  log('Active Top 10')
-  for i in range(10):
-    url, count = active_rankings[i]
-    log('[%s] %s\t%s' %(i, url, count))
-  log('-----------------------------------')
-  log('Common Top 10')
-  for i in range(10):
-    url, count = common_rankings[i]
-    log('[%s] %s\t%s' %(i, url, count))
-    
-  ground_truth_url_to_rank = {}
-  for rank, (url, count) in enumerate(gt_rankings):
-    ground_truth_url_to_rank[url] = rank
-  experts_rank_to_url = {}
-  active_rank_to_url = {}
-  common_rank_to_url = {}
-  for rank, (url, count) in enumerate(expert_rankings):
-    experts_rank_to_url[rank] = url
-  for rank, (url, count) in enumerate(active_rankings):
-    active_rank_to_url[rank] = url
-  for rank, (url, count) in enumerate(common_rankings):
-    common_rank_to_url[rank] = url
-  avg_diffs_expert = calculate_diff_avg(ground_truth_url_to_rank,
-                                        experts_rank_to_url)
-  avg_diffs_active = calculate_diff_avg(ground_truth_url_to_rank,
-                                        active_rank_to_url)
-  avg_diffs_common = calculate_diff_avg(ground_truth_url_to_rank,
-                                        common_rank_to_url)
+    with open('../data/report/ground_truth_rankings_%s.tsv' % delta, 'w') as f:
+      for url, count in gt_rankings:
+        f.write('%s\t%s\n' % (url.strip(), count))
+    with open('../data/report/market_rankings_%s.tsv' % delta, 'w') as f:
+      for url, count in market_rankings:
+        f.write('%s\t%s\n' % (url.strip(), count))
+    with open('../data/report/newsaholic_rankings_%s.tsv' % delta, 'w') as f:
+      for url, count in expert_rankings:
+        f.write('%s\t%s\n' % (url.strip(), count))
+    with open('../data/report/active_user_rankings_%s.tsv' % delta, 'w') as f:
+      for url, count in active_rankings:
+        f.write('%s\t%s\n' % (url.strip(), count))
+    with open('../data/report/common_user_rankings_%s.tsv' % delta, 'w') as f:
+      for url, count in common_rankings:
+        f.write('%s\t%s\n' % (url.strip(), count))
 
-  draw_graph(avg_diffs_expert, avg_diffs_active, avg_diffs_common)
+    log('Num ground_truth_rankings: %s' % len(gt_rankings))
+    num_votes_market = 0
+    for url, count in market_rankings:
+      num_votes_market += count
+    log('Num market rankings: %s' % len(market_rankings))
+    log('Num market votes: %s' % num_votes_market)
+    num_votes_experts = 0
+    for url, count in expert_rankings:
+      num_votes_experts += count
+    log('Num expert rankings: %s' % len(expert_rankings))
+    log('Num expert votes: %s' % num_votes_experts)
+    num_votes_active = 0
+    for url, count in active_rankings:
+      num_votes_active += count
+    log('Num active_rankings: %s' % len(active_rankings))
+    log('Num active votes: %s' % num_votes_active)
+    num_votes_common = 0
+    for url, count in common_rankings:
+      num_votes_common += count
+    log('Num common_rankings: %s' % len(common_rankings))
+    log('Num common votes: %s' % num_votes_common)
+
+    with open('../data/report/user_demographics_%s.txt' % delta, 'w') as f:
+      f.write('Number of Newsaholics: %s\n' % len(experts))
+      f.write('Number of Active Users: %s\n' % len(active_users))
+      f.write('Number of Common Users: %s\n' % len(common_users))
+      f.write('Number of Users (Total): %s\n' % (len(experts) + len(active_users)
+                                               + len(common_users)))
+      f.write('\n')
+      f.write('Number of votes by Newsaholics: %s\n' % num_votes_experts)
+      f.write('Number of votes by Market: %s\n' % num_votes_market)
+      f.write('Number of votes by Active Users: %s\n'  % num_votes_active)
+      f.write('Number of votes by Common Users: %s\n' % num_votes_common)
+      f.write('Total Number of votes cast: %s\n' % (num_votes_experts
+                                                    + num_votes_active
+                                                    + num_votes_common))
+
+    log('Ground Truth Top 10')
+    for i in range(10):
+      url, count = gt_rankings[i]
+      log('[%s] %s\t%s' %(i, url.strip(), count))
+    log('-----------------------------------')
+    log('Market Top 10')
+    for i in range(10):
+      url, count = market_rankings[i]
+      log('[%s] %s\t%s' %(i, url.strip(), count))
+    log('-----------------------------------')
+    log('Expert Top 10')
+    for i in range(10):
+      url, count = expert_rankings[i]
+      log('[%s] %s\t%s' %(i, url.strip(), count))
+    log('-----------------------------------')
+    log('Active Top 10')
+    for i in range(10):
+      url, count = active_rankings[i]
+      log('[%s] %s\t%s' %(i, url.strip(), count))
+    log('-----------------------------------')
+    log('Common Top 10')
+    for i in range(10):
+      url, count = common_rankings[i]
+      log('[%s] %s\t%s' %(i, url.strip(), count))
+      
+    ground_truth_url_to_rank = {}
+    for rank, (url, count) in enumerate(gt_rankings):
+      ground_truth_url_to_rank[url] = rank
+    market_rank_to_url = {}
+    experts_rank_to_url = {}
+    active_rank_to_url = {}
+    common_rank_to_url = {}
+    for rank, (url, count) in enumerate(expert_rankings):
+      experts_rank_to_url[rank] = url
+    for rank, (url, count) in enumerate(market_rankings):
+      market_rank_to_url[rank] = url
+    for rank, (url, count) in enumerate(active_rankings):
+      active_rank_to_url[rank] = url
+    for rank, (url, count) in enumerate(common_rankings):
+      common_rank_to_url[rank] = url
+    avg_diffs_expert = calculate_diff_avg(ground_truth_url_to_rank,
+                                          experts_rank_to_url)
+    avg_diffs_market = calculate_diff_avg(ground_truth_url_to_rank,
+                                          market_rank_to_url)
+    avg_diffs_active = calculate_diff_avg(ground_truth_url_to_rank,
+                                          active_rank_to_url)
+    avg_diffs_common = calculate_diff_avg(ground_truth_url_to_rank,
+                                          common_rank_to_url)
+
+    draw_graph(avg_diffs_expert, avg_diffs_market, avg_diffs_active,
+               avg_diffs_common, delta)
 
 
 def log(message):
   """Helper method to modularize the format of log messages.
   
   Keyword Arguments:
-  message -- A string to print.
+  message -- A string to log.
   """
-  print '[%s] %s' % (datetime.now(), message)
+  FileLog.log(_LOG_FILE, message)
   
 
 if __name__ == "__main__":
