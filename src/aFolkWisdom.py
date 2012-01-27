@@ -6,7 +6,9 @@ throughout this analysis:
 ground_truth -- Determined as the ranking after summing up the tweet counts for
 all four months.
 
-experts -- Defined as the top 2% of active users when ranked by the rate at
+market -- Defined as all users.
+
+newsaholics -- Defined as the top 2% of active users when ranked by the rate at
 which they tweet.
 
 active_users -- Defined as users between 2% and 25% when ranked by the rate at
@@ -14,6 +16,10 @@ which they tweet.
 
 common_users -- Defined as users ranked more than 25% when ranked by the rate
 at which they tweet.
+
+Tweet counts for the user groups (market, newsaholics, active users, and common
+users) are counted if they occur within a certain time delta of the original
+introduction of that url.
 
 __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 """
@@ -28,14 +34,23 @@ from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
 import matplotlib.axis
 
-from datetime import datetime 
+from datetime import datetime
+from datetime import timedelta
 import math
 from math import sqrt
 
 
+_USER_ACTIVITY_FILE_ID_INDEX = 0
+_USER_ACTIVITY_FILE_COUNT_INDEX = 1
+
+_TIMEDELTAS_FILE_TWEET_ID_INDEX = 0
+_TIMEDELTAS_FILE_USER_ID_INDEX = 1 
+_TIMEDELTAS_FILE_DELTA_INDEX = 2
+_TIMEDELTAS_FILE_URL_INDEX = 3
+
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
-_DELTAS = [1, 4, 8]
+_DELTAS = [1, 4, 8] # Given in hours.
 
 
 def calculate_diff_avg(ground_truth_url_to_rank, other_rank_to_url):
@@ -64,11 +79,13 @@ def calculate_diff_avg(ground_truth_url_to_rank, other_rank_to_url):
   return avg_diffs
 
 
-def draw_graph(expert_diffs, market_diffs, active_diffs, common_diffs, delta):
+def draw_graph(newsaholic_diffs, market_diffs, active_diffs, common_diffs,
+               delta):
   """Draws the graph for avg diffs.
   
   Keyword Arguments:
-  expert_diffs -- The diffs in raking between experts and truth.
+  newsaholics_diffs -- The diffs in raking between newsaholics and truth.
+  market_diffs -- The diffs in raking between the market and the truth.
   active_diffs -- The diffs in ranking between active users and truth.
   common_diffs -- The diffs in ranking between common users and truth.
   """
@@ -80,9 +97,9 @@ def draw_graph(expert_diffs, market_diffs, active_diffs, common_diffs, delta):
                         market_diffs)
   plots.append(market_plot)
 
-  expert_plot = ax.plot([i for i in range(1, len(expert_diffs) + 1)],
-                        expert_diffs)
-  plots.append(expert_plot)
+  newsaholic_plot = ax.plot([i for i in range(1, len(newsaholic_diffs) + 1)],
+                        newsaholic_diffs)
+  plots.append(newsaholic_plot)
 
   active_plot = ax.plot([i for i in range(1, len(active_diffs) + 1)],
                         active_diffs)
@@ -95,9 +112,9 @@ def draw_graph(expert_diffs, market_diffs, active_diffs, common_diffs, delta):
   plt.legend(plots, ['Market', 'News-aholics', 'Active Users', 'Common Users'],
              loc=0)
 
-  max_y = max([max(market_diffs), max(expert_diffs), max(active_diffs),
+  max_y = max([max(market_diffs), max(newsaholic_diffs), max(active_diffs),
                max(common_diffs)])
-  plt.axis([1, len(expert_diffs) + 1, 0, max_y])
+  plt.axis([1, len(newsaholic_diffs) + 1, 0, max_y])
   plt.grid(True, which='major', linewidth=1)
 
   ax.xaxis.set_minor_locator(MultipleLocator(100))
@@ -119,71 +136,133 @@ def draw_graph(expert_diffs, market_diffs, active_diffs, common_diffs, delta):
   log('Outputted graph: Ranking Performance by User Group with %s Hour Delta'
       % delta)
   plt.close()
-  
 
-def get_rankings(delta, cache, experts, active_users):
-  """Gets the true rankings, and ranking returned by expert, active, and common.
+
+def gather_tweet_counts(newsaholics, active, hours=None):
+  """Gathers the tweet counts for a given set of months.
+  
+  Only counts votes if they occur within the given time delta from the seed
+  time (except for the ground truth rankings).
   
   Keyword Arguments:
-  cache -- Dictionary mapping short url to long url.
-  experts -- A set of user ids representing expert users.
+  newsaholics -- A set containing the user ids of 'newsaholic' users.
+  active -- A set containing the user ids of 'active' users.
+  hours -- The desired time delta, given in hours.
+  
+  Returns:
+  gt_tweet_counts -- Dictionary of url to tweet count for all users.
+  market_tweet_counts -- Dictionary of url to tweet count for the market.
+  newsaholic_tweet_counts -- Dictionary of url to tweet count for newsaholics.
+  active_tweet_counts -- Dictionary of url to tweet count for active users.
+  common_tweet_counts -- Dictionary of url to tweet count for common users.
+  """
+  gt_tweet_counts = {}
+  market_tweet_counts = {}
+  newsaholic_tweet_counts = {}
+  active_tweet_counts = {}
+  common_tweet_counts = {}
+  with open('../data/FolkWisdom/time_deltas.tsv') as f:
+    for line in f:
+      tokens = line.split('\t')
+      url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
+      user_id = tokens[_TIMEDELTAS_FILE_USER_ID_INDEX]
+      time_delta = timedelta(seconds=int(tokens[_TIMEDELTAS_FILE_DELTA_INDEX]))
+      max_delta = timedelta.max
+      if hours:
+        max_delta = timedelta(hours=hours)
+      if url in gt_tweet_counts:
+        gt_tweet_counts[url] += 1
+      else:
+        gt_tweet_counts[url] = 1
+
+      if time_delta < max_delta:
+        # Market
+        if url in market_tweet_counts:
+          market_tweet_counts[url] += 1
+        else:
+          market_tweet_counts[url] = 1
+
+        # Other groups
+        if user_id in newsaholics:
+          if url in newsaholic_tweet_counts:
+            newsaholic_tweet_counts[url] += 1
+          else:
+            newsaholic_tweet_counts[url] = 1
+        elif user_id in active:
+          if url in active_tweet_counts:
+            active_tweet_counts[url] += 1
+          else:
+            active_tweet_counts[url] = 1                
+        else:
+          if url in common_tweet_counts:
+            common_tweet_counts[url] += 1
+          else:
+            common_tweet_counts[url] = 1                
+                
+  return (gt_tweet_counts, market_tweet_counts, newsaholic_tweet_counts,
+          active_tweet_counts, common_tweet_counts)
+
+
+def get_rankings(delta, newsaholics, active_users):
+  """Gets the true rankings, and ranking as determined by various user groups.
+  
+  Keyword Arguments:
+  delta -- The time window, in hours.
+  newsaholics -- A set of user ids representing newsaholic users.
   active_users -- A set of user ids representing active users.
   
   Returns:
   gt_rankings -- The ground truth rankings as a list of (url, count) pairs.
-  expert_rankings -- The rankings as given by expert users, as a list of
+  market_rankings -- The rankings as given by the market, as a list of
   (url, count) pairs.
+  newsaholic_rankings -- The rankings as given by newsaholic users, as a list
+  of (url, count) pairs.
   active_rankings -- The rankings as given by active users, as a list of
   (url, count) pairs.
   common_rankings -- The rankings as given by common users, as a list of
   (url, count) pairs.
   """
-  gtc, mtc, etc, atc, ctc = DataUtils.gather_tweet_counts(cache, experts,
-                                                          active_users, delta)
-  # DataUtils.eliminate_news(['08'], gtc, cache)
-  # DataUtils.eliminate_news(['08'], etc, cache)
-  # DataUtils.eliminate_news(['08'], atc, cache)
-  # DataUtils.eliminate_news(['08'], ctc, cache)
-  # DataUtils.add_tweet_counts(['12'], gtc, cache)
-  # DataUtils.add_tweet_counts(['12'], etc, cache)
-  # DataUtils.add_tweet_counts(['12'], atc, cache)
-  # DataUtils.add_tweet_counts(['12'], ctc, cache)
+  log('Getting Rankings')
+  gtc, mtc, etc, atc, ctc = gather_tweet_counts(newsaholics, active_users,
+                                                delta)
   gt_rankings = sorted(gtc.items(), key=lambda x: x[1], reverse=True)
   market_rankings = sorted(mtc.items(), key=lambda x: x[1], reverse=True)
-  expert_rankings = sorted(etc.items(), key=lambda x: x[1], reverse=True)
+  newsaholic_rankings = sorted(etc.items(), key=lambda x: x[1], reverse=True)
   active_rankings = sorted(atc.items(), key=lambda x: x[1], reverse=True)
   common_rankings = sorted(ctc.items(), key=lambda x: x[1], reverse=True)
-  return (gt_rankings, market_rankings, expert_rankings, active_rankings,
-         common_rankings)
+  return (gt_rankings, market_rankings, newsaholic_rankings, active_rankings,
+          common_rankings)
 
 
 def group_users():
-  """Groups users into 'expert', 'active', and 'common' categories.
-  
-  Keyword Arguments:
-  user_id_sorted_by_tweet_count -- A list of (user_id, tweet_count) pairs in 
-  ranked (sorted by count) order.
+  """Groups users into 'newsaholic', 'active', and 'common' categories.
   
   Returns:
-  experts -- A python set of user ids for expert users, defined as users in top
-  2% of users as ranked by activity.
+  newsaholics -- A python set of user ids for newsaholic users, defined as
+  users in top 2% of users as ranked by activity.
   active_users -- A python set of user ids for active users, defined as users
   in between 2% and 25% of users as ranked by activity.
   common_users -- A python set of user ids for common users, defined as users
   whose rank is lower the 25% as ranked by activity.
   """
-  user_id_sorted = DataUtils.get_users_sorted_by_tweet_count(['08', '09', '10', '11', '12'])
-  num_users = len(user_id_sorted)
+  log('Grouping Users')
+  user_ids_sorted = []
+  with open('../data/FolkWisdom/user_activity.tsv') as f:
+    for line in f:
+      tokens = line.split('\t')
+      user_id = tokens[_USER_ACTIVITY_FILE_ID_INDEX]
+      user_ids_sorted.append(user_id)
+  num_users = len(user_ids_sorted)
   bucket_size = num_users / 100
   
-  experts = set()
+  newsaholics = set()
   active_users = set()
   common_users = set()
   current_percentile = 1
   for i in range(num_users):
-    (user_id, _) = user_id_sorted[i]
+    user_id = user_ids_sorted[i]
     if current_percentile < 3:
-      experts.add(user_id)
+      newsaholics.add(user_id)
     elif current_percentile < 26:
       active_users.add(user_id)
     else:
@@ -194,7 +273,7 @@ def group_users():
       # decimal bucket sizes. This takes care of this "rounding issue".
       if current_percentile < 100:
         current_percentile += 1
-  return experts, active_users, common_users
+  return newsaholics, active_users, common_users
 
 
 def run():
@@ -203,23 +282,22 @@ def run():
   A high level overview of the logic is as follows:
   
   1. Load a cache of short urls to long urls
-  2. Group users into expert, active, and common groups.
+  2. Group users into newsaholic, active, and common groups.
   3. Get both the true rankings, and the rankings as given by each group.
   4. Compare group rankings against the ground truth rankings.
   5. Draw graph.
   """
   FileLog.set_log_dir()
-  cache = DataUtils.load_cache()
 
-  experts, active_users, common_users = group_users()
-  log('Num experts: %s' % len(experts))
+  newsaholics, active_users, common_users = group_users()
+  log('Num newsaholics: %s' % len(newsaholics))
   log('Num active: %s' % len(active_users))
   log('Num common: %s' % len(common_users))
 
   for delta in _DELTAS:
     log('Finding rankings with an %s hour delta.' % delta)
-    (gt_rankings, market_rankings, expert_rankings,
-     active_rankings, common_rankings) = get_rankings(delta, cache, experts,
+    (gt_rankings, market_rankings, newsaholic_rankings,
+     active_rankings, common_rankings) = get_rankings(delta, newsaholics,
                                                       active_users)
 
     with open('../data/report/ground_truth_rankings_%s.tsv' % delta, 'w') as f:
@@ -229,7 +307,7 @@ def run():
       for url, count in market_rankings:
         f.write('%s\t%s\n' % (url.strip(), count))
     with open('../data/report/newsaholic_rankings_%s.tsv' % delta, 'w') as f:
-      for url, count in expert_rankings:
+      for url, count in newsaholic_rankings:
         f.write('%s\t%s\n' % (url.strip(), count))
     with open('../data/report/active_user_rankings_%s.tsv' % delta, 'w') as f:
       for url, count in active_rankings:
@@ -244,11 +322,11 @@ def run():
       num_votes_market += count
     log('Num market rankings: %s' % len(market_rankings))
     log('Num market votes: %s' % num_votes_market)
-    num_votes_experts = 0
-    for url, count in expert_rankings:
-      num_votes_experts += count
-    log('Num expert rankings: %s' % len(expert_rankings))
-    log('Num expert votes: %s' % num_votes_experts)
+    num_votes_newsaholics = 0
+    for url, count in newsaholic_rankings:
+      num_votes_newsaholics += count
+    log('Num newsaholic rankings: %s' % len(newsaholic_rankings))
+    log('Num newsaholic votes: %s' % num_votes_newsaholics)
     num_votes_active = 0
     for url, count in active_rankings:
       num_votes_active += count
@@ -261,17 +339,18 @@ def run():
     log('Num common votes: %s' % num_votes_common)
 
     with open('../data/report/user_demographics_%s.txt' % delta, 'w') as f:
-      f.write('Number of Newsaholics: %s\n' % len(experts))
+      f.write('Number of Newsaholics: %s\n' % len(newsaholics))
       f.write('Number of Active Users: %s\n' % len(active_users))
       f.write('Number of Common Users: %s\n' % len(common_users))
-      f.write('Number of Users (Total): %s\n' % (len(experts) + len(active_users)
-                                               + len(common_users)))
+      f.write('Number of Users (Total): %s\n' % (len(newsaholics)
+                                                 + len(active_users)
+                                                 + len(common_users)))
       f.write('\n')
-      f.write('Number of votes by Newsaholics: %s\n' % num_votes_experts)
+      f.write('Number of votes by Newsaholics: %s\n' % num_votes_newsaholics)
       f.write('Number of votes by Market: %s\n' % num_votes_market)
       f.write('Number of votes by Active Users: %s\n'  % num_votes_active)
       f.write('Number of votes by Common Users: %s\n' % num_votes_common)
-      f.write('Total Number of votes cast: %s\n' % (num_votes_experts
+      f.write('Total Number of votes cast: %s\n' % (num_votes_newsaholics
                                                     + num_votes_active
                                                     + num_votes_common))
 
@@ -285,9 +364,9 @@ def run():
       url, count = market_rankings[i]
       log('[%s] %s\t%s' %(i, url.strip(), count))
     log('-----------------------------------')
-    log('Expert Top 10')
+    log('Newsaholic Top 10')
     for i in range(10):
-      url, count = expert_rankings[i]
+      url, count = newsaholic_rankings[i]
       log('[%s] %s\t%s' %(i, url.strip(), count))
     log('-----------------------------------')
     log('Active Top 10')
@@ -304,19 +383,19 @@ def run():
     for rank, (url, count) in enumerate(gt_rankings):
       ground_truth_url_to_rank[url] = rank
     market_rank_to_url = {}
-    experts_rank_to_url = {}
+    newsaholic_rank_to_url = {}
     active_rank_to_url = {}
     common_rank_to_url = {}
-    for rank, (url, count) in enumerate(expert_rankings):
-      experts_rank_to_url[rank] = url
+    for rank, (url, count) in enumerate(newsaholic_rankings):
+      newsaholic_rank_to_url[rank] = url
     for rank, (url, count) in enumerate(market_rankings):
       market_rank_to_url[rank] = url
     for rank, (url, count) in enumerate(active_rankings):
       active_rank_to_url[rank] = url
     for rank, (url, count) in enumerate(common_rankings):
       common_rank_to_url[rank] = url
-    avg_diffs_expert = calculate_diff_avg(ground_truth_url_to_rank,
-                                          experts_rank_to_url)
+    avg_diffs_newsaholic = calculate_diff_avg(ground_truth_url_to_rank,
+                                          newsaholic_rank_to_url)
     avg_diffs_market = calculate_diff_avg(ground_truth_url_to_rank,
                                           market_rank_to_url)
     avg_diffs_active = calculate_diff_avg(ground_truth_url_to_rank,
@@ -324,7 +403,7 @@ def run():
     avg_diffs_common = calculate_diff_avg(ground_truth_url_to_rank,
                                           common_rank_to_url)
 
-    draw_graph(avg_diffs_expert, avg_diffs_market, avg_diffs_active,
+    draw_graph(avg_diffs_newsaholic, avg_diffs_market, avg_diffs_active,
                avg_diffs_common, delta)
 
 
