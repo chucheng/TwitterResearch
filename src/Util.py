@@ -1,10 +1,21 @@
 """Util.py contains only function that can be reused many times"""
+import Configuration
 import pickle
 import os
 import sys
 import smtplib
 import datetime
 from email.mime.text import MIMEText
+
+
+def get_graph_output_dir(output_dir):
+  """Assign an output path for the graph(s)."""
+  cfg = Configuration.getConfig()
+  graph_dir = cfg.get('Path', 'base-dir') + cfg.get('Path', 'graph-dir')
+  graph_dir += output_dir
+  ensure_dir_exist(graph_dir)
+  return graph_dir
+
 
 def load_pickle(input_pickle_filename):
     """Load a pickle and return"""
