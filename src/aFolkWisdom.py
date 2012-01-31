@@ -40,6 +40,12 @@ import math
 from math import sqrt
 
 
+_BETA = 1
+
+_HITS_MISSES_FILE_USER_ID_INDEX = 0
+_HITS_MISSES_FILE_HITS_INDEX = 1
+_HITS_MISSES_FILE_MISSES_INDEX = 2
+
 _USER_ACTIVITY_FILE_ID_INDEX = 0
 _USER_ACTIVITY_FILE_COUNT_INDEX = 1
 
@@ -339,6 +345,78 @@ def get_rankings(delta, newsaholics, active_users):
           common_rankings)
 
 
+def select_experts_confidence_interval(delta):
+  users = {}
+  with open('../data/FolkWisdom/user_hits_and_misses_%s.tsv' % delta) as f:
+    log('Selecting experts via CI method for delta %s.' %delta)
+    for line in f:
+      tokens = line.split('\t')
+      user_id = tokens[_HITS_MISSES_FILE_USER_ID_INDEX]
+      hits = int(tokens[_HITS_MISSES_FILE_HITS_INDEX])
+      misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
+      trials = hits + misses
+      p = float(hits + 2) / (trials + 4)
+      error = 1.96 * sqrt((p * (1 - p)) / float(trials + 4))
+      low = max(0.0, p - error)
+      high = min(1.0, p + error)
+      avg_of_ci = (low + high) / 2.0
+      users[user_id] = avg_of_ci
+  users_sorted = sorted(users.items(), key=lambda x: x[1], reverse=True)
+  num_experts_to_select = int(len(users_sorted) * .02)
+  experts = set()
+  for i in range(0, num_experts_to_select):
+    user_id, _ = users_sorted[i]
+    experts.add(user_id)
+  return experts
+
+
+def select_experts_fscore(size_target_news, delta):
+  users = {}
+  with open('../data/FolkWisdom/user_hits_and_misses_%s.tsv' % delta) as f:
+    log('Selecting experts via F_score method for delta %s.' %delta)
+    for line in f:
+      tokens = line.split('\t')
+      user_id = tokens[_HITS_MISSES_FILE_USER_ID_INDEX]
+      hits = int(tokens[_HITS_MISSES_FILE_HITS_INDEX])
+      misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
+      precision = float(hits) / (hits + misses)
+      recall = float(hits) / size_target_news
+      f_score = (1 + _BETA**2)
+      # Make sure to do this only if we will have a non-zero denominator.
+      if not precision == 0 or not recall == 0:
+        f_score *= ((precision * recall) / ((_BETA**2 * precision) + recall))
+      else:
+        f_score = 0.0
+      users[user_id] = f_score
+  users_sorted = sorted(users.items(), key=lambda x: x[1], reverse=True)
+  num_experts_to_select = int(len(users_sorted) * .02)
+  experts = set()
+  for i in range(0, num_experts_to_select):
+    user_id, _ = users_sorted[i]
+    experts.add(user_id)
+  return experts
+
+
+def select_experts_precision(delta):
+  users = {}
+  with open('../data/FolkWisdom/user_hits_and_misses_%s.tsv' % delta) as f:
+    log('Selecting experts via precision method for delta %s.' %delta)
+    for line in f:
+      tokens = line.split('\t')
+      user_id = tokens[_HITS_MISSES_FILE_USER_ID_INDEX]
+      hits = int(tokens[_HITS_MISSES_FILE_HITS_INDEX])
+      misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
+      precision = float(hits) / (hits + misses)
+      users[user_id] = precision
+  users_sorted = sorted(users.items(), key=lambda x: x[1], reverse=True)
+  num_experts_to_select = int(len(users_sorted) * .02)
+  experts = set()
+  for i in range(0, num_experts_to_select):
+    user_id, _ = users_sorted[i]
+    experts.add(user_id)
+  return experts
+
+
 def group_users():
   """Groups users into 'newsaholic', 'active', and 'common' categories.
   
@@ -404,6 +482,11 @@ def run():
     (gt_rankings, market_rankings, newsaholic_rankings,
      active_rankings, common_rankings) = get_rankings(delta, newsaholics,
                                                       active_users)
+
+    size_target_news = int(len(gt_rankings) * .02)
+    experts_precision = select_experts_precision(delta)
+    experts_fscore = select_experts_fscore(size_target_news, delta)
+    experts_ci = select_experts_confidence_interval(delta)
 
     log('Num ground_truth_rankings: %s' % len(gt_rankings))
     num_votes_market = 0
