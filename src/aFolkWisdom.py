@@ -79,6 +79,42 @@ def calculate_diff_avg(ground_truth_url_to_rank, other_rank_to_url):
   return avg_diffs
 
 
+def calc_precision_recall(gt_rankings, other_rankings):
+  """Calculates the precision recall scores for a set of rankings against truth.
+
+  Keyword Arguments:
+  gt_rankings -- A list of (url, count) pairs representing the ground truth
+                 rankings.
+  other_rankings -- A list of (url, count) pairs representing the other
+                    rankings.
+
+  Returns:
+  precisions -- A list of precisions, with the index equal to the number of
+                'guesses'.
+  recalls -- A list of recalls, with the index equal to the number of 'guesses'.
+  """
+  max_num_news_to_consider = int(len(gt_rankings) * .02)
+  target_news = set()
+  for i in range(max_num_news_to_consider):
+    (url, count) = gt_rankings[i]
+    target_news.add(url)
+  precisions = []
+  recalls = []
+  # Increate # guesses from 1 to max_number
+  for num_guesses in range(1, max_num_news_to_consider + 1):
+    # for each guess, check if it's a hit
+    hits = 0.0
+    for j in range(0, num_guesses):
+      (url, count) = other_rankings[j]
+      if url in target_news:
+        hits += 1
+    precision = (hits / num_guesses) * 100.0
+    recall = (hits / len(target_news)) * 100.0
+    precisions.append(precision)
+    recalls.append(recall)
+  return precisions, recalls
+
+
 def draw_graph(newsaholic_diffs, market_diffs, active_diffs, common_diffs,
                delta):
   """Draws the graph for avg diffs.
@@ -134,6 +170,75 @@ def draw_graph(newsaholic_diffs, market_diffs, active_diffs, common_diffs,
     plt.savefig(graph, format='eps')
 
   log('Outputted graph: Ranking Performance by User Group with %s Hour Delta'
+      % delta)
+  plt.close()
+
+
+def draw_precision_recall_graph(market_precisions, market_recalls,
+                                newsaholic_precisions, newsaholic_recalls,
+                                active_precisions, active_recalls,
+                                common_precisions, common_recalls, delta):
+  """Draws the precision recall graph for all the user groups and a given delta.
+
+  Keyword Arguments:
+  market_precisions -- A list of precision values, with the index being the
+                       number of guesses - 1.
+  market_recalls -- A list of recall values, with the index being the number
+                    of guesses.
+  market_precisions -- A list of precision values, with the index being the
+                       number of guesses - 1.
+  newsaholic_precisions -- A list of precision values, with the index being the
+                           number of guesses - 1.
+  newsaholic_recalls -- A list of recall values, with the index being the
+                        number of guesses - 1.
+  active_precisions -- A list of precision values, with the index being the
+                       number of guesses - 1.
+  active_recalls -- A list of recall values, with the index being the
+                    number of guesses - 1.
+  common_precisions -- A list of precision values, with the index being the
+                       number of guesses - 1.
+  common_recalls -- A list of recall values, with the index being the
+                    number of guesses - 1.
+  delta -- The number of hours of the time window in which votes were counted.
+  """
+  plots = []
+  figure = plt.figure()
+  ax = figure.add_subplot(111)
+
+  market_plot = ax.plot(market_recalls, market_precisions)
+  plots.append(market_plot)
+
+  newsaholic_plot = ax.plot(newsaholic_recalls, newsaholic_precisions)
+  plots.append(newsaholic_plot)
+
+  active_plot = ax.plot(active_recalls, active_precisions)
+  plots.append(active_plot)
+
+  common_plot = ax.plot(common_recalls, common_precisions)
+  plots.append(common_plot)
+
+  plt.legend(plots, ['Market', 'News-aholics', 'Active Users', 'Common Users'],
+             loc=0)
+
+  max_x = max([max(market_recalls), max(newsaholic_recalls),
+               max(active_recalls), max(common_recalls)])
+  plt.axis([0, max_x + 5, 0, 105])
+  plt.grid(True, which='major', linewidth=1)
+
+  ax.xaxis.set_minor_locator(MultipleLocator(5))
+  ax.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Recall (%)')
+  plt.ylabel('Precision (%)')
+  plt.title('Precision vs Recall by User Group with %s Hour Delta' % delta)
+
+  with open(_GRAPH_DIR + 'precision_recall_%s.png' % delta, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + 'precision_recall_%s.eps' % delta, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  log('Outputted graph: Precision vs Recall by User Group with %s Hour Delta'
       % delta)
   plt.close()
 
@@ -300,22 +405,6 @@ def run():
      active_rankings, common_rankings) = get_rankings(delta, newsaholics,
                                                       active_users)
 
-    with open('../data/report/ground_truth_rankings_%s.tsv' % delta, 'w') as f:
-      for url, count in gt_rankings:
-        f.write('%s\t%s\n' % (url.strip(), count))
-    with open('../data/report/market_rankings_%s.tsv' % delta, 'w') as f:
-      for url, count in market_rankings:
-        f.write('%s\t%s\n' % (url.strip(), count))
-    with open('../data/report/newsaholic_rankings_%s.tsv' % delta, 'w') as f:
-      for url, count in newsaholic_rankings:
-        f.write('%s\t%s\n' % (url.strip(), count))
-    with open('../data/report/active_user_rankings_%s.tsv' % delta, 'w') as f:
-      for url, count in active_rankings:
-        f.write('%s\t%s\n' % (url.strip(), count))
-    with open('../data/report/common_user_rankings_%s.tsv' % delta, 'w') as f:
-      for url, count in common_rankings:
-        f.write('%s\t%s\n' % (url.strip(), count))
-
     log('Num ground_truth_rankings: %s' % len(gt_rankings))
     num_votes_market = 0
     for url, count in market_rankings:
@@ -405,6 +494,41 @@ def run():
 
     draw_graph(avg_diffs_newsaholic, avg_diffs_market, avg_diffs_active,
                avg_diffs_common, delta)
+
+    with open('../data/report/ground_truth_rankings_%s.tsv' % delta, 'w') as f:
+      for url, count in gt_rankings:
+        f.write('%s\t%s\n' % (url.strip(), count))
+    with open('../data/report/market_rankings_%s.tsv' % delta, 'w') as f:
+      for rank, (url, count) in enumerate(market_rankings):
+        f.write('%s\t%s\t(%s,%s)\n' % (url.strip(), count, rank,
+                ground_truth_url_to_rank[url]))
+    with open('../data/report/newsaholic_rankings_%s.tsv' % delta, 'w') as f:
+      for rank, (url, count) in enumerate(newsaholic_rankings):
+        f.write('%s\t%s\t(%s,%s)\n' % (url.strip(), count, rank,
+                ground_truth_url_to_rank[url]))
+    with open('../data/report/active_user_rankings_%s.tsv' % delta, 'w') as f:
+      for rank, (url, count) in enumerate(active_rankings):
+        f.write('%s\t%s\t(%s,%s)\n' % (url.strip(), count, rank,
+                ground_truth_url_to_rank[url]))
+    with open('../data/report/common_user_rankings_%s.tsv' % delta, 'w') as f:
+      for rank, (url, count) in enumerate(common_rankings):
+        f.write('%s\t%s\t(%s,%s)\n' % (url.strip(), count, rank,
+                ground_truth_url_to_rank[url]))
+
+    market_precisions, market_recalls = calc_precision_recall(gt_rankings,
+                                                              market_rankings)
+    (newsaholic_precisions,
+     newsaholic_recalls) = calc_precision_recall(gt_rankings,
+                                                 newsaholic_rankings)
+    active_precisions, active_recalls = calc_precision_recall(gt_rankings,
+                                                              active_rankings)
+    common_precisions, common_recalls = calc_precision_recall(gt_rankings,
+                                                              common_rankings)
+
+    draw_precision_recall_graph(market_precisions, market_recalls,
+                                newsaholic_precisions, newsaholic_recalls,
+                                active_precisions, active_recalls,
+                                common_precisions, common_recalls, delta)
 
 
 def log(message):
