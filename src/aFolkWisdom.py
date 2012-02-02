@@ -42,6 +42,8 @@ from math import sqrt
 
 _BETA = .5
 
+_SIZE_EXPERTS = .10
+
 _HITS_MISSES_FILE_USER_ID_INDEX = 0
 _HITS_MISSES_FILE_HITS_INDEX = 1
 _HITS_MISSES_FILE_MISSES_INDEX = 2
@@ -53,6 +55,8 @@ _TIMEDELTAS_FILE_TWEET_ID_INDEX = 0
 _TIMEDELTAS_FILE_USER_ID_INDEX = 1 
 _TIMEDELTAS_FILE_DELTA_INDEX = 2
 _TIMEDELTAS_FILE_URL_INDEX = 3
+
+_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
@@ -130,7 +134,7 @@ def calc_precision_recall(gt_rankings, other_rankings):
 
 def draw_avg_diff_graph(newsaholic_diffs, market_diffs, active_diffs,
                         common_diffs, expert_p_diffs, expert_f_diffs,
-                        expert_c_diffs, delta):
+                        expert_c_diffs, expert_s_diffs, delta):
   """Draws the graph for avg diffs.
   
   Keyword Arguments:
@@ -168,15 +172,19 @@ def draw_avg_diff_graph(newsaholic_diffs, market_diffs, active_diffs,
   expert_c_plot = ax.plot([i for i in range(1, len(expert_c_diffs) + 1)],
                           expert_c_diffs)
   plots.append(expert_c_plot)
+  expert_s_plot = ax.plot([i for i in range(1, len(expert_s_diffs) + 1)],
+                          expert_s_diffs)
+  plots.append(expert_s_plot)
 
 
   labels = ['Market', 'News-aholics', 'Active Users', 'Common Users',
-            'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)']
-  plt.legend(plots, labels, loc=0)
+            'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)',
+            'Super Experts']
+  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
 
   max_y = max([max(market_diffs), max(newsaholic_diffs), max(active_diffs),
                max(common_diffs), max(expert_p_diffs), max(expert_f_diffs),
-               max(expert_c_diffs)])
+               max(expert_c_diffs), max(expert_s_diffs)])
   plt.axis([1, len(newsaholic_diffs) + 1, 0, max_y])
   plt.grid(True, which='major', linewidth=1)
 
@@ -208,6 +216,7 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
                                 expert_p_precisions, expert_p_recalls,
                                 expert_f_precisions, expert_f_recalls,
                                 expert_c_precisions, expert_c_recalls,
+                                expert_s_precisions, expert_s_recalls,
                                 delta):
   """Draws the precision recall graph for all the user groups and a given delta.
 
@@ -254,10 +263,13 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
   plots.append(expert_f_plot)
   expert_c_plot = ax.plot(expert_c_recalls, expert_c_precisions)
   plots.append(expert_c_plot)
+  expert_s_plot = ax.plot(expert_s_recalls, expert_s_precisions)
+  plots.append(expert_s_plot)
 
   labels = ['Market', 'News-aholics', 'Active Users', 'Common Users',
-            'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)']
-  plt.legend(plots, labels, loc=0)
+            'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)',
+            'Super Experts']
+  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
 
   max_x = max([max(market_recalls), max(newsaholic_recalls),
                max(active_recalls), max(common_recalls)])
@@ -282,8 +294,8 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
   plt.close()
 
 
-def gather_tweet_counts(hours, newsaholics, active, experts_precision,
-                        experts_fscore, experts_ci):
+def gather_tweet_counts(hours, seeds, newsaholics, active, experts_precision,
+                        experts_fscore, experts_ci, super_experts):
   """Gathers the tweet counts for a given set of months.
   
   Only counts votes if they occur within the given time delta from the seed
@@ -308,6 +320,7 @@ def gather_tweet_counts(hours, newsaholics, active, experts_precision,
   experts_precision_tc = {}
   experts_fscore_tc = {}
   experts_ci_tc = {}
+  experts_s_tc = {}
   with open('../data/FolkWisdom/time_deltas.tsv') as f:
     for line in f:
       tokens = line.split('\t')
@@ -318,56 +331,67 @@ def gather_tweet_counts(hours, newsaholics, active, experts_precision,
       if hours:
         max_delta = timedelta(hours=hours)
 
-      if time_delta < max_delta:
-        # Market
-        if url in market_tweet_counts:
-          market_tweet_counts[url] += 1
-        else:
-          market_tweet_counts[url] = 1
+      if url in seeds:
+        seed_time = seeds[url]
+        if (seed_time >= datetime(year=2011, month=11, day=1)
+        and seed_time < datetime(year=2011, month=12, day=1)):
 
-        # Other groups
-        if user_id in newsaholics:
-          if url in newsaholic_tweet_counts:
-            newsaholic_tweet_counts[url] += 1
-          else:
-            newsaholic_tweet_counts[url] = 1
-        elif user_id in active:
-          if url in active_tweet_counts:
-            active_tweet_counts[url] += 1
-          else:
-            active_tweet_counts[url] = 1                
-        else:
-          if url in common_tweet_counts:
-            common_tweet_counts[url] += 1
-          else:
-            common_tweet_counts[url] = 1                
-        
-        if user_id in experts_precision:
-          if url in experts_precision_tc:
-            experts_precision_tc[url] += 1
-          else:
-            experts_precision_tc[url] = 1
+          if time_delta < max_delta:
+            # Market
+            if url in market_tweet_counts:
+              market_tweet_counts[url] += 1
+            else:
+              market_tweet_counts[url] = 1
 
-        if user_id in experts_fscore:
-          if url in experts_fscore_tc:
-            experts_fscore_tc[url] += 1
-          else:
-            experts_fscore_tc[url] = 1
+            # Other groups
+            if user_id in newsaholics:
+              if url in newsaholic_tweet_counts:
+                newsaholic_tweet_counts[url] += 1
+              else:
+                newsaholic_tweet_counts[url] = 1
+            elif user_id in active:
+              if url in active_tweet_counts:
+                active_tweet_counts[url] += 1
+              else:
+                active_tweet_counts[url] = 1                
+            else:
+              if url in common_tweet_counts:
+                common_tweet_counts[url] += 1
+              else:
+                common_tweet_counts[url] = 1                
+            
+            if user_id in experts_precision:
+              if url in experts_precision_tc:
+                experts_precision_tc[url] += 1
+              else:
+                experts_precision_tc[url] = 1
 
-        if user_id in experts_ci:
-          if url in experts_ci_tc:
-            experts_ci_tc[url] += 1
-          else:
-            experts_ci_tc[url] = 1
+            if user_id in experts_fscore:
+              if url in experts_fscore_tc:
+                experts_fscore_tc[url] += 1
+              else:
+                experts_fscore_tc[url] = 1
+
+            if user_id in experts_ci:
+              if url in experts_ci_tc:
+                experts_ci_tc[url] += 1
+              else:
+                experts_ci_tc[url] = 1
+
+            if user_id in super_experts:
+              if url in experts_s_tc:
+                experts_s_tc[url] += 1
+              else:
+                experts_s_tc[url] = 1
 
                 
   return (market_tweet_counts, newsaholic_tweet_counts, active_tweet_counts,
           common_tweet_counts, experts_precision_tc, experts_fscore_tc,
-          experts_ci_tc)
+          experts_ci_tc, experts_s_tc)
 
 
-def get_rankings(delta, newsaholics, active_users, experts_precision,
-                 experts_fscore, experts_ci):
+def get_rankings(delta, seeds, newsaholics, active_users, experts_precision,
+                 experts_fscore, experts_ci, super_experts):
   """Gets the true rankings, and ranking as determined by various user groups.
   
   Keyword Arguments:
@@ -388,9 +412,11 @@ def get_rankings(delta, newsaholics, active_users, experts_precision,
   """
   log('Getting Rankings')
   (mtc, etc, atc, ctc,
-   eptc, eftc, ecitc) = gather_tweet_counts(delta, newsaholics, active_users,
-                                            experts_precision, experts_fscore,
-                                            experts_ci)
+   eptc, eftc, ecitc, setc) = gather_tweet_counts(delta, seeds, newsaholics,
+                                                  active_users,
+                                                  experts_precision,
+                                                  experts_fscore,
+                                                  experts_ci, super_experts)
   market_rankings = sorted(mtc.items(), key=lambda x: x[1], reverse=True)
   newsaholic_rankings = sorted(etc.items(), key=lambda x: x[1], reverse=True)
   active_rankings = sorted(atc.items(), key=lambda x: x[1], reverse=True)
@@ -400,12 +426,13 @@ def get_rankings(delta, newsaholics, active_users, experts_precision,
   expert_fscore_rankings = sorted(eftc.items(), key=lambda x: x[1],
                                   reverse=True)
   expert_ci_rankings = sorted(ecitc.items(), key=lambda x: x[1], reverse=True)
+  expert_s_rankings = sorted(setc.items(), key=lambda x: x[1], reverse=True)
   return (market_rankings, newsaholic_rankings, active_rankings,
           common_rankings, expert_precision_rankings, expert_fscore_rankings,
-          expert_ci_rankings)
+          expert_ci_rankings, expert_s_rankings)
 
 
-def get_gt_rankings():
+def get_gt_rankings(seeds):
   """Generate the ground truth rankings.
   
   Returns:
@@ -417,10 +444,14 @@ def get_gt_rankings():
     for line in f:
       tokens = line.split('\t')
       url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
-      if url in gt_tweet_counts:
-        gt_tweet_counts[url] += 1
-      else:
-        gt_tweet_counts[url] = 1
+      if url in seeds:
+        seed_time = seeds[url]
+        if (seed_time >= datetime(year=2011, month=11, day=1)
+        and seed_time < datetime(year=2011, month=12, day=1)):
+          if url in gt_tweet_counts:
+            gt_tweet_counts[url] += 1
+          else:
+            gt_tweet_counts[url] = 1
 
   gt_rankings = sorted(gt_tweet_counts.items(), key=lambda x: x[1],
                        reverse=True)
@@ -446,7 +477,7 @@ def select_experts_confidence_interval():
       avg_of_ci = (low + high) / 2.0
       users[user_id] = avg_of_ci
   users_sorted = sorted(users.items(), key=lambda x: x[1], reverse=True)
-  num_experts_to_select = int(num_users * .10)
+  num_experts_to_select = int(num_users * _SIZE_EXPERTS)
   experts = set()
   for i in range(0, num_experts_to_select):
     user_id, _ = users_sorted[i]
@@ -475,7 +506,7 @@ def select_experts_fscore(size_target_news):
         f_score = 0.0
       users[user_id] = f_score
   users_sorted = sorted(users.items(), key=lambda x: x[1], reverse=True)
-  num_experts_to_select = int(num_users * .10)
+  num_experts_to_select = int(num_users * _SIZE_EXPERTS)
   experts = set()
   for i in range(0, num_experts_to_select):
     user_id, _ = users_sorted[i]
@@ -497,11 +528,10 @@ def select_experts_precision(valid_users):
         misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
         precision = float(hits) / (hits + misses)
         users[user_id] = (precision, hits + misses)
-  # us_secondary = sorted(users.items(), key=lambda x: x[1][1], reverse=True)
-  # users_sorted = sorted(us_secondary, key=lambda x: x[1][0], reverse=True)
-  users_sorted = sorted(users.items(), key=lambda x: x[1][0], reverse=True)
+  us_secondary = sorted(users.items(), key=lambda x: x[1][1], reverse=True)
+  users_sorted = sorted(us_secondary, key=lambda x: x[1][0], reverse=True)
   log('Num Users (2): %s' % len(users_sorted))
-  num_experts_to_select = int(num_users * .10)
+  num_experts_to_select = int(num_users * _SIZE_EXPERTS)
   experts = set()
   for i in range(0, num_experts_to_select):
     user_id, _ = users_sorted[i]
@@ -552,6 +582,19 @@ def group_users():
   return newsaholics, active_users, common_users
 
 
+def load_seeds():
+  log('Loading seeds.')
+  seeds = {}
+  with open('../data/FolkWisdom/seed_times.tsv') as f:
+    for line in f:
+      tokens = line.split('\t')
+      url = tokens[3]
+      seed_time = datetime.strptime(tokens[2],
+                                            _DATETIME_FORMAT)
+      seeds[url] = seed_time
+  return seeds
+
+
 def run():
   """Contains the main logic for this analysis.
   
@@ -565,7 +608,8 @@ def run():
   """
   FileLog.set_log_dir()
 
-  gt_rankings = get_gt_rankings()
+  seeds = load_seeds()
+  gt_rankings = get_gt_rankings(seeds)
   log('Num ground_truth_rankings: %s' % len(gt_rankings))
   ground_truth_url_to_rank = {}
   for rank, (url, count) in enumerate(gt_rankings):
@@ -581,19 +625,25 @@ def run():
   experts_precision = select_experts_precision(newsaholics.union(active_users))
   experts_fscore = select_experts_fscore(size_target_news)
   experts_ci = select_experts_confidence_interval()
+  super_experts = experts_precision.intersection(experts_fscore).intersection(experts_ci)
 
   log('Num experts (precision): %s' % len(experts_precision))
   log('Num experts (fscore): %s' % len(experts_fscore))
   log('Num experts (ci): %s' % len(experts_ci))
+  log('Num Super Experts: %s' %len(super_experts))
 
 
   for delta in _DELTAS:
     log('Finding rankings with an %s hour delta.' % delta)
     (market_rankings, newsaholic_rankings, active_rankings,
     common_rankings, expert_precision_rankings, expert_fscore_rankings,
-    expert_ci_rankings) = get_rankings(delta, newsaholics, active_users,
-                                       experts_precision, experts_fscore,
-                                       experts_ci)
+    expert_ci_rankings, expert_s_rankings) = get_rankings(delta, seeds, 
+                                                          newsaholics,
+                                                          active_users,
+                                                          experts_precision,
+                                                          experts_fscore,
+                                                          experts_ci,
+                                                          super_experts)
 
     num_votes_market = 0
     for url, count in market_rankings:
@@ -630,6 +680,11 @@ def run():
       num_votes_expert_ci += count
     log('Num expert_ci rankings: %s' % len(expert_ci_rankings))
     log('Num expert_ci votes: %s' % num_votes_expert_ci)
+    num_votes_expert_s = 0
+    for url, count in expert_s_rankings:
+      num_votes_expert_s += count
+    log('Num expert_s rankings: %s' % len(expert_s_rankings))
+    log('Num expert_s votes: %s' % num_votes_expert_s)
 
 
     with open('../data/report/user_demographics_%s.txt' % delta, 'w') as f:
@@ -637,6 +692,7 @@ def run():
       f.write('Number of Active Users: %s\n' % len(active_users))
       f.write('Number of Common Users: %s\n' % len(common_users))
       f.write('Number of Experts: %s\n' % len(experts_precision))
+      f.write('Number of Super Experts: %s\n' % len(super_experts))
       f.write('Number of Users (Total): %s\n' % (len(newsaholics)
                                                  + len(active_users)
                                                  + len(common_users)))
@@ -651,6 +707,7 @@ def run():
               % num_votes_expert_fscore) 
       f.write('Number of votes by Expert (ci) Users: %s\n'
               % num_votes_expert_ci) 
+      f.write('Number of votes by Super Experts: %s\n' % num_votes_expert_s)
       f.write('Total Number of votes cast: %s\n' % (num_votes_newsaholics
                                                     + num_votes_active
                                                     + num_votes_common))
@@ -694,6 +751,11 @@ def run():
     for i in range(5):
       url, count = expert_ci_rankings[i]
       log('[%s] %s\t%s' %(i, url.strip(), count))
+    log('-----------------------------------')
+    log('Super Expert Top 5')
+    for i in range(5):
+      url, count = expert_s_rankings[i]
+      log('[%s] %s\t%s' %(i, url.strip(), count))
       
     market_rank_to_url = {}
     newsaholic_rank_to_url = {}
@@ -702,6 +764,7 @@ def run():
     expert_p_rank_to_url = {}
     expert_f_rank_to_url = {}
     expert_c_rank_to_url = {}
+    expert_s_rank_to_url = {}
     for rank, (url, count) in enumerate(newsaholic_rankings):
       newsaholic_rank_to_url[rank] = url
     for rank, (url, count) in enumerate(market_rankings):
@@ -716,6 +779,8 @@ def run():
       expert_f_rank_to_url[rank] = url
     for rank, (url, count) in enumerate(expert_ci_rankings):
       expert_c_rank_to_url[rank] = url
+    for rank, (url, count) in enumerate(expert_s_rankings):
+      expert_s_rank_to_url[rank] = url
 
     avg_diffs_newsaholic = calculate_diff_avg(ground_truth_url_to_rank,
                                           newsaholic_rank_to_url)
@@ -732,10 +797,13 @@ def run():
                                             expert_f_rank_to_url)
     avg_diffs_expert_c = calculate_diff_avg(ground_truth_url_to_rank,
                                             expert_c_rank_to_url)
+    avg_diffs_expert_s = calculate_diff_avg(ground_truth_url_to_rank,
+                                            expert_s_rank_to_url)
 
     draw_avg_diff_graph(avg_diffs_newsaholic, avg_diffs_market,
                         avg_diffs_active, avg_diffs_common, avg_diffs_expert_p,
-                        avg_diffs_expert_f, avg_diffs_expert_c, delta)
+                        avg_diffs_expert_f, avg_diffs_expert_c,
+                        avg_diffs_expert_s, delta)
 
     with open('../data/report/ground_truth_rankings_%s.tsv' % delta, 'w') as f:
       for url, count in gt_rankings:
@@ -768,6 +836,10 @@ def run():
       for rank, (url, count) in enumerate(expert_ci_rankings):
         f.write('%s\t%s\t(%s,%s)\n' % (url.strip(), count, rank,
                 ground_truth_url_to_rank[url]))
+    with open('../data/report/expert_s_user_rankings_%s.tsv' % delta, 'w') as f:
+      for rank, (url, count) in enumerate(expert_s_rankings):
+        f.write('%s\t%s\t(%s,%s)\n' % (url.strip(), count, rank,
+                ground_truth_url_to_rank[url]))
 
     market_precisions, market_recalls = calc_precision_recall(gt_rankings,
                                                               market_rankings)
@@ -780,13 +852,16 @@ def run():
                                                               common_rankings)
     (expert_p_precisions,
      expert_p_recalls) = calc_precision_recall(gt_rankings,
-                                              expert_precision_rankings)
+                                               expert_precision_rankings)
     (expert_f_precisions,
      expert_f_recalls) = calc_precision_recall(gt_rankings,
-                                              expert_fscore_rankings)
+                                               expert_fscore_rankings)
     (expert_c_precisions,
      expert_c_recalls) = calc_precision_recall(gt_rankings,
-                                              expert_ci_rankings)
+                                               expert_ci_rankings)
+    (expert_s_precisions,
+     expert_s_recalls) = calc_precision_recall(gt_rankings,
+                                               expert_s_rankings)
 
     draw_precision_recall_graph(market_precisions, market_recalls,
                                 newsaholic_precisions, newsaholic_recalls,
@@ -795,6 +870,7 @@ def run():
                                 expert_p_precisions, expert_p_recalls,
                                 expert_f_precisions, expert_f_recalls,
                                 expert_c_precisions, expert_c_recalls,
+                                expert_s_precisions, expert_s_recalls,
                                 delta)
 
 

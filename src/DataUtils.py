@@ -34,12 +34,12 @@ _YEAR = '2011'
 _LOG_FILE = 'DataUtils.log'
 _DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
-_TRAINING_SET_MONTHS = ['08', '09']
-_TESTING_SET_MONTHS = ['10', '11']
+_TRAINING_SET_MONTHS = ['09', '10']
+_TESTING_SET_MONTHS = ['11']
 _FULL_SET_MONTHS = ['08', '09', '10', '11', '12']
 
 
-def get_gt_rankings():
+def get_gt_rankings(seeds):
   """Generate the ground truth rankings.
   
   Returns:
@@ -50,10 +50,14 @@ def get_gt_rankings():
     for line in f:
       tokens = line.split('\t')
       url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
-      if url in gt_tweet_counts:
-        gt_tweet_counts[url] += 1
-      else:
-        gt_tweet_counts[url] = 1
+      if url in seeds:
+        seed_tweet_id, seed_user_id, seed_time = seeds[url]
+        if (seed_time >= datetime(year=2011, month=9, day=1)
+            and seed_time < datetime(year=2011, month=11, day=1)):
+          if url in gt_tweet_counts:
+            gt_tweet_counts[url] += 1
+          else:
+            gt_tweet_counts[url] = 1
 
   gt_rankings = sorted(gt_tweet_counts.items(), key=lambda x: x[1],
                        reverse=True)
@@ -202,6 +206,7 @@ def find_hits_and_mises(months, target_news, cache):
   log('Wrote hits and misses to disk.')
   return hits_and_misses
 
+
 def sort_users_by_tweet_count(months):
   """Sorts users by their tweet activity.
   
@@ -267,16 +272,16 @@ def log(message):
 
 def run():
   cache = load_cache()
-  # user_ids_sorted = sort_users_by_tweet_count(_FULL_SET_MONTHS)
-  # seeds = find_seed_times(_FULL_SET_MONTHS, cache)
+  # user_ids_sorted = sort_users_by_tweet_count(_TRAINING_SET_MONTHS)
+  seeds = find_seed_times(_FULL_SET_MONTHS, cache)
   # time_deltas = find_delta_times(_FULL_SET_MONTHS, seeds, cache)
-  gt_rankings = get_gt_rankings()
+  gt_rankings = get_gt_rankings(seeds)
   num_news = int(len(gt_rankings) * .02)
   target_news = set()
   for i in range(0, num_news):
     url, count = gt_rankings[i]
     target_news.add(url)
-  hits_and_misses = find_hits_and_mises(_FULL_SET_MONTHS, target_news, cache)
+  hits_and_misses = find_hits_and_mises(_TRAINING_SET_MONTHS, target_news, cache)
 
 
 if __name__ == "__main__":
