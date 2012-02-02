@@ -458,15 +458,15 @@ def get_gt_rankings(seeds):
   return gt_rankings
 
 
-def select_experts_confidence_interval():
+def select_experts_confidence_interval(num_users):
   users = {}
-  num_users = 0
+  # num_users = 0
   with open('../data/FolkWisdom/user_hits_and_misses.tsv') as f:
     log('Selecting experts via CI method.')
     for line in f:
       tokens = line.split('\t')
       user_id = tokens[_HITS_MISSES_FILE_USER_ID_INDEX]
-      num_users += 1
+      # num_users += 1
       hits = int(tokens[_HITS_MISSES_FILE_HITS_INDEX])
       misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
       trials = hits + misses
@@ -485,15 +485,15 @@ def select_experts_confidence_interval():
   return experts
 
 
-def select_experts_fscore(size_target_news):
+def select_experts_fscore(size_target_news, num_users):
   users = {}
-  num_users = 0
+  # num_users = 0
   with open('../data/FolkWisdom/user_hits_and_misses.tsv') as f:
     log('Selecting experts via F_score method.')
     for line in f:
       tokens = line.split('\t')
       user_id = tokens[_HITS_MISSES_FILE_USER_ID_INDEX]
-      num_users += 1
+      # num_users += 1
       hits = int(tokens[_HITS_MISSES_FILE_HITS_INDEX])
       misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
       precision = float(hits) / (hits + misses)
@@ -514,15 +514,15 @@ def select_experts_fscore(size_target_news):
   return experts
 
 
-def select_experts_precision(valid_users):
+def select_experts_precision(valid_users, num_users):
   users = {}
-  num_users = 0
+  # num_users = 0
   with open('../data/FolkWisdom/user_hits_and_misses.tsv') as f:
     log('Selecting experts via precision method.')
     for line in f:
       tokens = line.split('\t')
       user_id = tokens[_HITS_MISSES_FILE_USER_ID_INDEX]
-      num_users += 1
+      # num_users += 1
       if user_id in valid_users:
         hits = int(tokens[_HITS_MISSES_FILE_HITS_INDEX])
         misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
@@ -558,28 +558,22 @@ def group_users():
       user_id = tokens[_USER_ACTIVITY_FILE_ID_INDEX]
       user_ids_sorted.append(user_id)
   num_users = len(user_ids_sorted)
-  log('Num users (1): %s' % num_users)
-  bucket_size = num_users / 100
+  log('Num users (grouping): %s' % num_users)
+  two_percent = int(num_users * .02)
+  twenty_five_percent = int(num_users * .25)
   
   newsaholics = set()
   active_users = set()
   common_users = set()
-  current_percentile = 1
   for i in range(num_users):
     user_id = user_ids_sorted[i]
-    if current_percentile < 3:
+    if i <= two_percent:
       newsaholics.add(user_id)
-    elif current_percentile < 26:
+    elif i <= twenty_five_percent:
       active_users.add(user_id)
     else:
       common_users.add(user_id)
-    if i is not 0 and i % bucket_size is 0:
-      # Dont increase percentile past 100. We need to do this because we need
-      # bucket size to be a integer, but to have 100 even buckets we would need
-      # decimal bucket sizes. This takes care of this "rounding issue".
-      if current_percentile < 100:
-        current_percentile += 1
-  return newsaholics, active_users, common_users
+  return num_users, newsaholics, active_users, common_users
 
 
 def load_seeds():
@@ -617,14 +611,14 @@ def run():
   size_target_news = int(len(gt_rankings) * .02)
   log('Size target_news: %s' % size_target_news)
 
-  newsaholics, active_users, common_users = group_users()
+  num_users, newsaholics, active_users, common_users = group_users()
   log('Num newsaholics: %s' % len(newsaholics))
   log('Num active: %s' % len(active_users))
   log('Num common: %s' % len(common_users))
 
-  experts_precision = select_experts_precision(newsaholics.union(active_users))
-  experts_fscore = select_experts_fscore(size_target_news)
-  experts_ci = select_experts_confidence_interval()
+  experts_precision = select_experts_precision(newsaholics.union(active_users), num_users)
+  experts_fscore = select_experts_fscore(size_target_news, num_users)
+  experts_ci = select_experts_confidence_interval(num_users)
   super_experts = experts_precision.intersection(experts_fscore).intersection(experts_ci)
 
   log('Num experts (precision): %s' % len(experts_precision))
