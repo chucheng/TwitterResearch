@@ -38,8 +38,10 @@ _TRAINING_SET_MONTHS = ['09', '10']
 _TESTING_SET_MONTHS = ['11']
 _FULL_SET_MONTHS = ['08', '09', '10', '11', '12']
 
+_CATEGORIES = ['technology', 'sports', 'business']
 
-def get_gt_rankings(seeds):
+
+def get_gt_rankings(seeds, category=None):
   """Generate the ground truth rankings.
   
   Returns:
@@ -54,10 +56,17 @@ def get_gt_rankings(seeds):
         seed_tweet_id, seed_user_id, seed_time = seeds[url]
         if (seed_time >= datetime(year=2011, month=9, day=1)
             and seed_time < datetime(year=2011, month=11, day=1)):
-          if url in gt_tweet_counts:
-            gt_tweet_counts[url] += 1
-          else:
-            gt_tweet_counts[url] = 1
+          category_matches = True
+          if category:
+            category_matches = False
+            url_category = URLUtil.extract_category(url)
+            if url_category == category:
+              category_matches = True
+          if category_matches:
+            if url in gt_tweet_counts:
+              gt_tweet_counts[url] += 1
+            else:
+              gt_tweet_counts[url] = 1
 
   gt_rankings = sorted(gt_tweet_counts.items(), key=lambda x: x[1],
                        reverse=True)
@@ -95,8 +104,9 @@ def find_delta_times(months, seeds, cache):
             urls = URLUtil.parse_urls(tweet_text, cache)
             for url in urls:
               seed_tweet_id, seed_user_id, seed_time = seeds[url]
+              category = URLUtil.extract_category(url)
               if tweet_id == seed_tweet_id:
-                time_deltas[tweet_id] = (user_id, 0, url)
+                time_deltas[tweet_id] = (user_id, 0, url, category)
               else:
                 created = datetime.strptime(tokens[_TWEETFILE_CREATED_AT_INDEX],
                                             _DATETIME_FORMAT)
@@ -105,14 +115,15 @@ def find_delta_times(months, seeds, cache):
                 # file later.
                 time_delta_in_seconds = (time_delta.days * 86400
                                          + time_delta.seconds)
-                time_deltas[tweet_id] = (user_id, time_delta_in_seconds, url)
+                time_deltas[tweet_id] = (user_id, time_delta_in_seconds, url,
+                                         category)
   sorted_deltas = sorted(time_deltas.items(), key=lambda x: x[1][1],
                          reverse=False)
   with open('../data/FolkWisdom/time_deltas.tsv', 'w') as f:
-    for (tweet_id, (user_id, time_delta, url)) in sorted_deltas:
-      f.write('%s\t%s\t%s\t%s' % (tweet_id, user_id, time_delta, url))
+    for (tweet_id, (user_id, time_delta, url, category)) in sorted_deltas:
+      f.write('%s\t%s\t%s\t%s\t%s\n' % (tweet_id, user_id, time_delta, url,
+                                      category))
   log('Wrote time deltas to disk')
-  return sorted_deltas
   
 
 def find_seed_times(months, cache):
@@ -160,7 +171,7 @@ def get_data_dir_name_for(month):
   return '%s/%s_%s' % (_DATA_DIR, _YEAR, month)
 
 
-def find_hits_and_mises(months, target_news, cache):
+def find_hits_and_mises(months, target_news, cache, category=None):
   """Finds the hit and miss count for each user.
 
   Keyword Arguments:
@@ -175,7 +186,8 @@ def find_hits_and_mises(months, target_news, cache):
   """
   hits_and_misses = {}
   for month in months:
-    log('Finding hits and misses for users from %s/%s' % (month, _YEAR))
+    log('Finding hits and misses for users from %s/%s for category %s'
+        % (month, _YEAR, category))
     dir_name = '%s/%s_%s' %(_DATA_DIR, _YEAR, month)
     for filename in os.listdir(dir_name):
       if '.tweet' in filename and 'http_nyti_ms' in filename:
@@ -187,27 +199,37 @@ def find_hits_and_mises(months, target_news, cache):
             tweet_text= tokens[_TWEETFILE_TWEET_TEXT_INDEX]
             urls = URLUtil.parse_urls(tweet_text, cache)
             for url in urls:
-              if url in target_news:
+              category_matches = True
+              if category:
+                category_matches = False
+                url_category = URLUtil.extract_category(url)
+                if category == url_category:
+                  category_matches = True
+              if url in target_news and category_matches:
                 if user_id in hits_and_misses:
                   (user_hits, user_misses) = hits_and_misses[user_id]
                   hits_and_misses[user_id] = (user_hits + 1, user_misses)
                 else:
                   hits_and_misses[user_id] = (1, 0)
-              else:
+              elif category_matches:
                 if user_id in hits_and_misses:
                   (user_hits, user_misses) = hits_and_misses[user_id]
                   hits_and_misses[user_id] = (user_hits, user_misses + 1)
                 else:
                   hits_and_misses[user_id] = (0, 1)
 
-  with open('../data/FolkWisdom/user_hits_and_misses.tsv', 'w') as f:
+  output_file = '../data/FolkWisdom/user_hits_and_misses'
+  if category:
+    output_file += '_%s.tsv' % category
+  else:
+    output_file = '.tsv'
+  with open(output_file, 'w') as f:
     for user_id, (hits, misses) in hits_and_misses.items():
       f.write('%s\t%s\t%s\n' % (user_id, hits, misses))
   log('Wrote hits and misses to disk.')
-  return hits_and_misses
 
 
-def sort_users_by_tweet_count(months):
+def sort_users_by_tweet_count(months, cache=None, category=None):
   """Sorts users by their tweet activity.
   
   Keyword Arguments:
@@ -219,7 +241,8 @@ def sort_users_by_tweet_count(months):
   """
   user_id_to_tweet_count = {}
   for month in months:
-    log('Gathering count information for users from %s/%s' % (month, _YEAR))
+    log('Gathering count information for users from %s/%s for category %s'
+        % (month, _YEAR, category))
     dir_name = '%s/%s_%s' %(_DATA_DIR, _YEAR, month)
     for filename in os.listdir(dir_name):
       if '.tweet' in filename and 'http_nyti_ms' in filename:
@@ -228,20 +251,40 @@ def sort_users_by_tweet_count(months):
           for line in f:
             tokens = line.split('\t')
             user_id = tokens[_TWEETFILE_USER_ID_INDEX]
-            if user_id_to_tweet_count.has_key(user_id):
-              user_id_to_tweet_count[user_id] += 1
+            if category:
+              tweet_text = tokens[_TWEETFILE_TWEET_TEXT_INDEX]
+              urls = URLUtil.parse_urls(tweet_text, cache)
+              correct_category = False
+              for url in urls:
+                url_category = URLUtil.extract_category(url)
+                if url_category == category:
+                  correct_category = True
+              if correct_category:
+                if user_id_to_tweet_count.has_key(user_id):
+                  user_id_to_tweet_count[user_id] += 1
+                else:
+                  user_id_to_tweet_count[user_id] = 1
             else:
-              user_id_to_tweet_count[user_id] = 1
+              if user_id_to_tweet_count.has_key(user_id):
+                user_id_to_tweet_count[user_id] += 1
+              else:
+                user_id_to_tweet_count[user_id] = 1
                 
   user_ids_sorted_by_tweet_count = sorted(user_id_to_tweet_count.items(),
                                           key=lambda x: x[1], reverse=True)
   
-  log("Size of users (total): " + str(len(user_id_to_tweet_count.keys())))
-  with open('../data/FolkWisdom/user_activity.tsv', 'w') as f:
+  log("Size of users for category %s (total): %s"
+      % (str(len(user_id_to_tweet_count.keys())), category))
+
+  output_file = '../data/FolkWisdom/user_activity'
+  if category:
+    output_file += '_%s.tsv' % category
+  else:
+    output_file += '.tsv'
+  with open(output_file, 'w') as f:
     for user_id, count in user_ids_sorted_by_tweet_count:
       f.write('%s\t%s\n' % (user_id, count))
   log('Wrote users (sorted by activity) to disk') 
-  return user_ids_sorted_by_tweet_count
 
 
 def load_cache():
@@ -270,18 +313,30 @@ def log(message):
   FileLog.log(_LOG_FILE, message)
 
 
-def run():
-  cache = load_cache()
-  # user_ids_sorted = sort_users_by_tweet_count(_TRAINING_SET_MONTHS)
-  seeds = find_seed_times(_FULL_SET_MONTHS, cache)
-  # time_deltas = find_delta_times(_FULL_SET_MONTHS, seeds, cache)
-  gt_rankings = get_gt_rankings(seeds)
+def find_target_news(seeds, category=None):
+  gt_rankings = get_gt_rankings(seeds, category)
   num_news = int(len(gt_rankings) * .02)
   target_news = set()
   for i in range(0, num_news):
     url, count = gt_rankings[i]
     target_news.add(url)
-  hits_and_misses = find_hits_and_mises(_TRAINING_SET_MONTHS, target_news, cache)
+  return target_news
+
+
+def run():
+  cache = load_cache()
+  sort_users_by_tweet_count(_TRAINING_SET_MONTHS)
+  for category in _CATEGORIES:
+    sort_users_by_tweet_count(_TRAINING_SET_MONTHS, cache,
+                                                category)
+  seeds = find_seed_times(_FULL_SET_MONTHS, cache)
+  find_delta_times(_FULL_SET_MONTHS, seeds, cache)
+  target_news = find_target_news(seeds)
+  find_hits_and_mises(_TRAINING_SET_MONTHS, target_news, cache)
+  for category in _CATEGORIES:
+    target_news = find_target_news(seeds, category)
+    find_hits_and_mises(_TRAINING_SET_MONTHS, target_news, cache, category)
+  log('Finished outputting data!')
 
 
 if __name__ == "__main__":
