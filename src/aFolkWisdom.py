@@ -43,7 +43,7 @@ import math
 from math import sqrt
 
 
-_BETA = .5
+_BETA = 2
 
 _SIZE_EXPERTS = .10
 _SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
@@ -65,7 +65,11 @@ _DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
-_DELTAS = [1, 4, 8] # Given in hours.
+
+_DELTAS = [] # Given in hours.
+_DELTAS.append(1)
+_DELTAS.append(4)
+_DELTAS.append(8)
 
 _CATEGORIES = []
 # Comment categories in/out individually as needed.
@@ -73,7 +77,7 @@ _CATEGORIES.append(None)
 _CATEGORIES.append('world')
 # _CATEGORIES.append('business')
 # _CATEGORIES.append('opinion')
-# _CATEGORIES.append('sports')
+_CATEGORIES.append('sports')
 # _CATEGORIES.append('us')
 _CATEGORIES.append('technology')
 # _CATEGORIES.append('movies')
@@ -259,27 +263,164 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
   market_plot = ax.plot(market_recalls, market_precisions)
   plots.append(market_plot)
 
-  newsaholic_plot = ax.plot(newsaholic_recalls, newsaholic_precisions)
+  # Groups
+  newsaholic_plot = ax.plot(newsaholic_recalls, newsaholic_precisions, '--',
+                            linewidth=2)
   plots.append(newsaholic_plot)
-
-  active_plot = ax.plot(active_recalls, active_precisions)
+  active_plot = ax.plot(active_recalls, active_precisions, ':',
+                        linewidth=2)
   plots.append(active_plot)
-
-  common_plot = ax.plot(common_recalls, common_precisions)
+  common_plot = ax.plot(common_recalls, common_precisions, '-.',
+                        linewidth=2)
   plots.append(common_plot)
 
-  expert_p_plot = ax.plot(expert_p_recalls, expert_p_precisions)
+  # Experts
+  expert_p_plot = ax.plot(expert_p_recalls, expert_p_precisions, '--',
+                          linewidth=2)
   plots.append(expert_p_plot)
-  expert_f_plot = ax.plot(expert_f_recalls, expert_f_precisions)
+  expert_f_plot = ax.plot(expert_f_recalls, expert_f_precisions, '-.',
+                          linewidth=2)
   plots.append(expert_f_plot)
-  expert_c_plot = ax.plot(expert_c_recalls, expert_c_precisions)
+  expert_c_plot = ax.plot(expert_c_recalls, expert_c_precisions, ':',
+                          linewidth=2)
   plots.append(expert_c_plot)
-  expert_s_plot = ax.plot(expert_s_recalls, expert_s_precisions, '--')
+  expert_s_plot = ax.plot(expert_s_recalls, expert_s_precisions, ':',
+                          linewidth=2)
   plots.append(expert_s_plot)
 
-  labels = ['Market', 'News-aholics', 'Active Users', 'Common Users',
+  labels = ['Market',
+            'News-aholics', 'Active Users', 'Common Users',
             'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)',
             'Super Experts']
+  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
+
+  max_x = max([max(market_recalls),
+               max(newsaholic_recalls), max(active_recalls),
+               max(common_recalls), max(expert_p_recalls),
+               max(expert_f_recalls), max(expert_c_recalls),
+               max(expert_s_recalls)])
+  plt.axis([0, max_x + 5, 0, 105])
+  plt.grid(True, which='major', linewidth=1)
+
+  ax.xaxis.set_minor_locator(MultipleLocator(5))
+  ax.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Recall (%)')
+  plt.ylabel('Precision (%)')
+
+  run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
+                                       int(_SIZE_EXPERTS * 100), category)
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_all_%s.png'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_all_%s.eps'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  log('Outputted graph: Precision vs Recall for Groups and Experts with '
+      '%s Hour Delta (%s)' % (delta, category))
+  plt.close()
+
+
+def draw_precision_recall_graph_experts(market_precisions, market_recalls,
+                                        expert_p_precisions, expert_p_recalls,
+                                        expert_f_precisions, expert_f_recalls,
+                                        expert_c_precisions, expert_c_recalls,
+                                        delta, category):
+  """Draws the precision recall graph for all the user groups and a given delta.
+
+  Keyword Arguments:
+  Requires two lists, one of precision values and one of recal values, for each
+  user group from the following: market, newsaholics, active users,
+  common users, and experts (precision, F-score, confidence interval, super).
+  This accounts for 8 user groups, meaning 16 lists in all.
+  delta -- The number of hours of the time window in which votes were counted.
+  category -- The category we are analyzing.
+  """
+  plots = []
+  figure = plt.figure()
+  ax = figure.add_subplot(111)
+
+  market_plot = ax.plot(market_recalls, market_precisions)
+  plots.append(market_plot)
+
+  expert_p_plot = ax.plot(expert_p_recalls, expert_p_precisions, '--',
+                          linewidth=2)
+  plots.append(expert_p_plot)
+  expert_f_plot = ax.plot(expert_f_recalls, expert_f_precisions, '-.',
+                          linewidth=2)
+  plots.append(expert_f_plot)
+  expert_c_plot = ax.plot(expert_c_recalls, expert_c_precisions, ':',
+                          linewidth=2)
+  plots.append(expert_c_plot)
+
+  labels = ['Market', 'Experts (Precision)', 'Experts (F-score)',
+            'Experts (CI)',]
+  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
+
+  max_x = max([max(market_recalls), max(expert_p_recalls),
+               max(expert_f_recalls), max(expert_c_recalls),])
+  plt.axis([0, max_x + 5, 0, 105])
+  plt.grid(True, which='major', linewidth=1)
+
+  ax.xaxis.set_minor_locator(MultipleLocator(5))
+  ax.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Recall (%)')
+  plt.ylabel('Precision (%)')
+
+  run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
+                                       int(_SIZE_EXPERTS * 100), category)
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_experts_%s.png'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_experts_%s.eps'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  log('Outputted graph: Precision vs Recall by Expert Group with '
+      '%s Hour Delta (%s)' % (delta, category))
+  plt.close()
+
+
+def draw_precision_recall_graph_groups(market_precisions, market_recalls,
+                                       newsaholic_precisions,
+                                       newsaholic_recalls, active_precisions,
+                                       active_recalls, common_precisions,
+                                       common_recalls, delta, category):
+  """Draws the precision recall graph for all the user groups and a given delta.
+
+  Keyword Arguments:
+  Requires two lists, one of precision values and one of recal values, for each
+  user group from the following: market, newsaholics, active users,
+  common users, and experts (precision, F-score, confidence interval, super).
+  This accounts for 8 user groups, meaning 16 lists in all.
+  delta -- The number of hours of the time window in which votes were counted.
+  category -- The category we are analyzing.
+  """
+  plots = []
+  figure = plt.figure()
+  ax = figure.add_subplot(111)
+
+  market_plot = ax.plot(market_recalls, market_precisions)
+  plots.append(market_plot)
+
+  newsaholic_plot = ax.plot(newsaholic_recalls, newsaholic_precisions, '--',
+                            linewidth=2)
+  plots.append(newsaholic_plot)
+
+  active_plot = ax.plot(active_recalls, active_precisions, ':',
+                        linewidth=2)
+  plots.append(active_plot)
+
+  common_plot = ax.plot(common_recalls, common_precisions, '-.',
+                        linewidth=2)
+  plots.append(common_plot)
+
+
+  labels = ['Market', 'News-aholics', 'Active Users', 'Common Users',]
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
 
   max_x = max([max(market_recalls), max(newsaholic_recalls),
@@ -293,15 +434,13 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
 
   plt.xlabel('Recall (%)')
   plt.ylabel('Precision (%)')
-  plt.title('Precision vs Recall by User Group with %s Hour Delta (%s)'
-            % (delta, category))
 
   run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
                                        int(_SIZE_EXPERTS * 100), category)
-  with open(_GRAPH_DIR + run_params_str + '/precision_recall_%s.png'
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_groups_%s.png'
             % run_params_str, 'w') as graph:
     plt.savefig(graph, format='png')
-  with open(_GRAPH_DIR + run_params_str + '/precision_recall_%s.eps'
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_groups_%s.eps'
             % run_params_str, 'w') as graph:
     plt.savefig(graph, format='eps')
 
@@ -991,14 +1130,28 @@ def run():
                                                  expert_s_rankings)
 
       draw_precision_recall_graph(market_precisions, market_recalls,
-                                  newsaholic_precisions, newsaholic_recalls,
-                                  active_precisions, active_recalls,
-                                  common_precisions, common_recalls,
-                                  expert_p_precisions, expert_p_recalls,
-                                  expert_f_precisions, expert_f_recalls,
-                                  expert_c_precisions, expert_c_recalls,
-                                  expert_s_precisions, expert_s_recalls,
-                                  delta, category)
+                                         newsaholic_precisions,
+                                         newsaholic_recalls,
+                                         active_precisions, active_recalls,
+                                         common_precisions, common_recalls,
+                                         expert_p_precisions, expert_p_recalls,
+                                         expert_f_precisions, expert_f_recalls,
+                                         expert_c_precisions, expert_c_recalls,
+                                         expert_s_precisions, expert_s_recalls,
+                                         delta, category)
+
+      draw_precision_recall_graph_experts(market_precisions, market_recalls,
+                                          expert_p_precisions, expert_p_recalls,
+                                          expert_f_precisions, expert_f_recalls,
+                                          expert_c_precisions, expert_c_recalls,
+                                          delta, category)
+
+      draw_precision_recall_graph_groups(market_precisions, market_recalls,
+                                         newsaholic_precisions,
+                                         newsaholic_recalls,
+                                         active_precisions, active_recalls,
+                                         common_precisions, common_recalls,
+                                         delta, category)
 
 
 def log(message):
