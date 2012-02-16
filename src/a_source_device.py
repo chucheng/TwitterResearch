@@ -34,9 +34,15 @@ def find_device_counts():
   """Finds the number of tweets by each source device.
 
   Returns:
-  Dictionary of source device string to total count.
+  Dictionary of source device string to pair of (count, percentage).
+  e.g. {'Twitter for iPhone': (1100, 10.0) ...}
   """
   device_counts = {}
+  all_count = 0
+  device_counts_original = {}
+  original_count = 0
+  device_counts_retweets = {}
+  retweet_count = 0
   for month in _FULL_SET_MONTHS:
     log('Finding device counts for month %s.' % month)
     dir_name = get_data_dir_name_for(month) 
@@ -50,11 +56,39 @@ def find_device_counts():
                                         _DATETIME_FORMAT)
             if is_in_window(created):
               source_device = tokens[_TWEETFILE_SOURCE_INDEX]
+              retweet = bool(int(tokens[_TWEETFILE_RETWEET_COUNT_INDEX]))
+              all_count += 1
               if source_device in device_counts:
                 device_counts[source_device] += 1
               else:
                 device_counts[source_device] = 1
-  return device_counts
+              if retweet:
+                retweet_count += 1
+                if source_device in device_counts_retweets:
+                  device_counts_retweets[source_device] += 1
+                else:
+                  device_counts_retweets[source_device] = 1
+              else:
+                original_count += 1
+                if source_device in device_counts_original:
+                  device_counts_original[source_device] += 1
+                else:
+                  device_counts_original[source_device] = 1
+
+  for device, count in device_counts_original.items():
+    device_total = device_counts[device]
+    device_counts_original[device] = (count,
+                                      (float(count) / original_count) * 100,
+                                      (float(count) / device_total) * 100)
+  for device, count in device_counts_retweets.items():
+    device_total = device_counts[device]
+    device_counts_retweets[device] = (count,
+                                      (float(count) / retweet_count) * 100,
+                                      (float(count) / device_total) * 100)
+  for device, count in device_counts.items():
+    device_counts[device] = (count, (float(count) / all_count) * 100)
+
+  return device_counts, device_counts_original, device_counts_retweets
 
 
 def get_data_dir_name_for(month):
@@ -92,14 +126,28 @@ def log(message):
 def run():
   """Main logic for this analysis."""
   FileLog.set_log_dir()
-  device_counts = find_device_counts()
-  sorted_counts = sorted(device_counts.items(), key=lambda x: x[1],
-                         reverse=True)
+  all_counts, original_counts, retweet_counts = find_device_counts()
+  sorted_all_counts = sorted(all_counts.items(), key=lambda x: x[1][0],
+                             reverse=True)
+  sorted_original_counts = sorted(original_counts.items(),
+                                  key=lambda x: x[1][0], reverse=True)
+  sorted_retweet_counts = sorted(retweet_counts.items(), key=lambda x: x[1][0],
+                                 reverse=True)
 
   Util.ensure_dir_exist(_OUTPUT_DIR)
-  with open(_OUTPUT_DIR + 'source_device.tsv', 'w') as out_file:
-    for device, count in sorted_counts:
-      out_file.write('%s\t%s\n' % (device, count))
+  with open(_OUTPUT_DIR + 'source_device_all.tsv', 'w') as out_file:
+    for device, (count, percentage) in sorted_all_counts:
+      out_file.write('%s\t%s\t%s\n' % (device, count, percentage))
+  with open(_OUTPUT_DIR + 'source_device_original.tsv', 'w') as out_file:
+    for device, (count, percent_of_originals,
+                 percent_tweets_original) in sorted_original_counts:
+      out_file.write('%s\t%s\t%s\t%s\n' % (device, count, percent_of_originals,
+                                           percent_tweets_original))
+  with open(_OUTPUT_DIR + 'source_device_retweets.tsv', 'w') as out_file:
+    for device, (count, percent_of_retweets,
+                 percent_tweets_retweets) in sorted_retweet_counts:
+      out_file.write('%s\t%s\t%s\t%s\n' % (device, count, percent_of_retweets,
+                                           percent_tweets_retweets))
   log('Analysis complete.')
   
 
