@@ -1054,6 +1054,39 @@ def run():
                           avg_diffs_expert_c, avg_diffs_expert_s, delta,
                           category)
 
+      market_url_to_rank = {}
+      precision_url_to_rank = {}
+      fscore_url_to_rank = {}
+      ci_url_to_rank = {}
+      for rank, (url, count) in enumerate(market_rankings):
+        market_url_to_rank[url] = rank
+      for rank, (url, count) in enumerate(expert_precision_rankings):
+        precision_url_to_rank[url] = rank
+      for rank, (url, count) in enumerate(expert_fscore_rankings):
+        fscore_url_to_rank[url] = rank
+      for rank, (url, count) in enumerate(expert_ci_rankings):
+        ci_url_to_rank[url] = rank
+      with open('%sranking_comparisons_%s.tsv'
+                % (info_output_dir, run_params_str), 'w') as out_file:
+        for gt_rank, (gt_url, gt_count) in enumerate(gt_rankings):
+          market_rank = 0
+          precision_rank = 0
+          ci_rank = 0
+          fscore_rank = 0
+          if gt_url in market_url_to_rank:
+            market_rank = market_url_to_rank[gt_url] + 1
+          if gt_url in precision_url_to_rank:
+            precision_rank = precision_url_to_rank[gt_url] + 1
+          if gt_url in ci_url_to_rank:
+            ci_rank = ci_url_to_rank[gt_url] + 1
+          if gt_url in fscore_url_to_rank:
+            fscore_rank = fscore_url_to_rank[gt_url] + 1
+          line = '%s\t%s\t%s\t%s\t%s\t%s\n' % (gt_url, gt_rank + 1, market_rank,
+                                               precision_rank, ci_rank,
+                                               fscore_rank)
+          out_file.write(line)
+
+
       with open('%sground_truth_rankings_%s.tsv'
                 % (info_output_dir, run_params_str), 'w') as output_file:
         for url, count in gt_rankings:
