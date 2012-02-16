@@ -31,7 +31,24 @@ _TIMEDELTAS_FILE_CATEGORY_INDEX = 4
 
 _SIZE_TOP_NEWS = .02
 
-_AGGREGATE_HOURS = [10**z for z in range(-5, 6)]
+
+def _determine_hours(low, high, step_percent):
+  """Calculates the x range for this analysis.
+
+  Keyword Arguments:
+  low -- The lower exponent to start at.
+  high -- The high exponent to end at.
+  step_percent -- The percent of the current power of 10 to step by.
+
+  Returns:
+  hours -- The hours used as the x range.
+  """
+  hours = []
+  for i in range(low, high):
+    hours += range(10**i, 10**(i+1), max(1, int(10**(i+1) * step_percent)))
+  return hours
+
+_AGGREGATE_HOURS = _determine_hours(-5, 6, .01)
 
 
 def aggr_by_hour(time_of_90s, top_news):
