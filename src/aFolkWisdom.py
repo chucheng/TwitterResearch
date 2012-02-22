@@ -30,6 +30,8 @@ __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 import FileLog
 import Util
 
+import sys
+
 import matplotlib
 matplotlib.use("Agg")
 
@@ -45,7 +47,7 @@ from math import sqrt
 
 _BETA = 2
 
-_SIZE_EXPERTS = .10
+_SIZE_EXPERTS = .02
 _SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
 
 _HITS_MISSES_FILE_USER_ID_INDEX = 0
@@ -449,6 +451,58 @@ def draw_precision_recall_graph_groups(market_precisions, market_recalls,
   plt.close()
 
 
+def draw_precision_recall_graph_mixed(market_precisions, market_recalls,
+                                      mixed_precisions, mixed_recalls,
+                                      delta, category):
+  """Draws the precision recall graph for all the user groups and a given delta.
+
+  Keyword Arguments:
+  Requires two lists, one of precision values and one of recal values, for each
+  user group from the following: market, newsaholics, active users,
+  common users, and experts (precision, F-score, confidence interval, super).
+  This accounts for 8 user groups, meaning 16 lists in all.
+  delta -- The number of hours of the time window in which votes were counted.
+  category -- The category we are analyzing.
+  """
+  plots = []
+  figure = plt.figure()
+  ax = figure.add_subplot(111)
+
+  market_plot = ax.plot(market_recalls, market_precisions, '--')
+  plots.append(market_plot)
+
+  mixed_plot = ax.plot(mixed_recalls, mixed_precisions)
+  plots.append(mixed_plot)
+
+
+  labels = ['Market', 'Mixed (Min)',]
+  plt.legend(plots, labels, loc=0)
+
+  max_x = max([max(market_recalls), max(mixed_recalls),])
+  plt.axis([0, max_x + 5, 0, 105])
+  plt.grid(True, which='major', linewidth=1)
+
+  ax.xaxis.set_minor_locator(MultipleLocator(5))
+  ax.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Recall (%)')
+  plt.ylabel('Precision (%)')
+
+  run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
+                                       int(_SIZE_EXPERTS * 100), category)
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_mixed_%s.png'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_mixed_%s.eps'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  log('Outputted graph: Precision vs Recall for Mixed with '
+      '%s Hour Delta (%s)' % (delta, category))
+  plt.close()
+
+
 def gather_tweet_counts(hours, seeds, newsaholics, active, experts_precision,
                         experts_fscore, experts_ci, super_experts,
                         category=None):
@@ -556,6 +610,74 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, experts_precision,
   return (market_tweet_counts, newsaholic_tweet_counts, active_tweet_counts,
           common_tweet_counts, experts_precision_tc, experts_fscore_tc,
           experts_ci_tc, experts_s_tc)
+
+
+def get_min_rankings(market_url_to_rank, precision_url_to_rank,
+                     fscore_url_to_rank, ci_url_to_rank, gt_url_to_rank):
+  """Finds ranking based on min ranking of 4 rankings sets.
+
+  Ground truths rankings are used to break ties.
+
+  Keyword Arguments:
+  market_url_to_rank -- Dictionary from url to market ranking.
+  precision_url_to_rank -- Dictionary from url to precision expert rankings.
+  fscore_url_to_rank -- Dictionary from url to fscore expert rankings.
+  ci_url_to_rank -- Dictionary from url to ci expert rankings.
+  gt_url_to_rank -- Dictionary from url to ground truth ranking.
+
+  Returns:
+  mixed_rankings -- A list of (url, count) pairs representing the rankings.
+  """
+  log('Getting mixed (min) rankings...')
+  urls = set()
+  urls = urls.union(market_url_to_rank.keys())
+  urls = urls.union(precision_url_to_rank.keys())
+  urls = urls.union(fscore_url_to_rank.keys())
+  urls = urls.union(ci_url_to_rank.keys())
+
+  mixed_rank_to_url_list = {}
+  for url in urls:
+    market_rank = sys.maxint
+    precision_rank = sys.maxint
+    fscore_rank = sys.maxint
+    ci_rank = sys.maxint
+    if url in market_url_to_rank:
+      market_rank = market_url_to_rank[url]
+    if url in precision_url_to_rank:
+      precision_rank = precision_url_to_rank[url]
+    if url in fscore_url_to_rank:
+      fscore_rank = fscore_url_to_rank[url]
+    if url in ci_url_to_rank:
+      ci_rank = ci_url_to_rank[url]
+    mixed_rank = min(market_rank, precision_rank, fscore_rank, ci_rank)
+    gt_rank = gt_url_to_rank[url]
+    if mixed_rank in mixed_rank_to_url_list:
+      mixed_rank_to_url_list[mixed_rank].append((url, gt_rank))
+    else:
+      mixed_rank_to_url_list[mixed_rank] = [(url, gt_rank),]
+
+  rankings = break_ties(mixed_rank_to_url_list)
+  return rankings
+
+def break_ties(mixed_rank_to_url_list):
+  """Breaks ties in rank when finding rankings for mixed model.
+
+  Keyword Argument:
+  mixed_rank_to_url_list -- A dictionary from rank to a list of
+                            (url, count) pairs for that rank.
+
+  Returns:
+  rankings - A list of (url, count) pairs representing the ranking w/ ties
+             broken.
+  """
+  log('Breaking ties...')
+  prelim_rankings = sorted(mixed_rank_to_url_list.items(), key=lambda x: x[0])
+  rankings = []
+  for _, urls in prelim_rankings:
+    urls_sorted = sorted(urls, key=lambda x: x[1])
+    for url in urls_sorted:
+      rankings.append(url)
+  return rankings
 
 
 def get_rankings(delta, seeds, newsaholics, active_users, experts_precision,
@@ -880,6 +1002,8 @@ def run():
                                                             super_experts,
                                                             category)
 
+
+
       num_votes_market = 0
       for url, count in market_rankings:
         num_votes_market += count
@@ -1066,6 +1190,21 @@ def run():
         fscore_url_to_rank[url] = rank
       for rank, (url, count) in enumerate(expert_ci_rankings):
         ci_url_to_rank[url] = rank
+
+      min_rankings = get_min_rankings(market_url_to_rank,
+                                      precision_url_to_rank,
+                                      fscore_url_to_rank,
+                                      ci_url_to_rank,
+                                      ground_truth_url_to_rank)
+      
+
+      log('-----------------------------------')
+      log('Mixed (min) Top 5')
+      for i in range(min(len(min_rankings), 5)):
+        url, count = min_rankings[i]
+        log('[%s] %s\t%s' %(i + 1, url, count))
+      log('-----------------------------------')
+
       with open('%sranking_comparisons_%s.tsv'
                 % (info_output_dir, run_params_str), 'w') as out_file:
         for gt_rank, (gt_url, gt_count) in enumerate(gt_rankings):
@@ -1139,6 +1278,12 @@ def run():
           output_file.write('%s\t%s\t(%s,%s)\n'
                             % (url.strip(), count, rank,
                             ground_truth_url_to_rank[url]))
+      with open('%smin_rankings_%s.tsv'
+                % (info_output_dir, run_params_str), 'w') as output_file:
+        for rank, (url, count) in enumerate(min_rankings):
+          output_file.write('%s\t%s\t(%s,%s)\n'
+                            % (url.strip(), count, rank,
+                            ground_truth_url_to_rank[url]))
 
       market_precisions, market_recalls = calc_precision_recall(gt_rankings,
                                                                 market_rankings)
@@ -1161,6 +1306,9 @@ def run():
       (expert_s_precisions,
        expert_s_recalls) = calc_precision_recall(gt_rankings,
                                                  expert_s_rankings)
+
+      min_precisions, min_recalls = calc_precision_recall(gt_rankings, 
+                                                          min_rankings)
 
       draw_precision_recall_graph(market_precisions, market_recalls,
                                          newsaholic_precisions,
@@ -1185,6 +1333,10 @@ def run():
                                          active_precisions, active_recalls,
                                          common_precisions, common_recalls,
                                          delta, category)
+
+      draw_precision_recall_graph_mixed(market_precisions, market_recalls,
+                                        min_precisions, min_recalls,
+                                        delta, category)
 
 
 def log(message):
