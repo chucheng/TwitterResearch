@@ -1,0 +1,32 @@
+"""
+This file contains constants that will be used accross analyses. This will
+ensure that we have consistent definitions accross all analyses.
+
+__author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)
+"""
+_TWEETFILE_TWEET_ID_INDEX = 0
+_TWEETFILE_USER_ID_INDEX = 1
+_TWEETFILE_TWEET_TEXT_INDEX = 2
+_TWEETFILE_CREATED_AT_INDEX = 3
+_TWEETFILE_RETWEETED_INDEX = 4
+_TWEETFILE_RETWEET_COUNT_INDEX = 5
+_TWEETFILE_ORIGIN_USER_ID_INDEX = 6
+_TWEETFILE_ORIGIN_TWEET_ID_INDEX = 7
+_TWEETFILE_SOURCE_INDEX = 8
+_TWEETFILE_FILTER_WORDS_INDEX = 9
+_TWEETFILE_INSERT_TIMESTAMP_INDEX = 10
+
+_TIMEDELTAS_FILE_TWEET_ID_INDEX = 0
+_TIMEDELTAS_FILE_USER_ID_INDEX = 1 
+_TIMEDELTAS_FILE_DELTA_INDEX = 2
+_TIMEDELTAS_FILE_URL_INDEX = 3
+
+_DATA_DIR = '/dfs/birch/tsv'
+_CACHE_FILENAME = '/dfs/birch/tsv/URLExapnd.cache.txt'
+_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+
+_DELTAS = [1, 4, 8]
+
+_TRAINING_SET_MONTHS = ['09', '10']
+_TESTING_SET_MONTHS = ['11', '12']
+_FULL_SET_MONTHS = ['08', '09', '10', '11', '12', '01']

@@ -6,6 +6,16 @@ import sys
 import smtplib
 import datetime
 from email.mime.text import MIMEText
+from datetime import datetime
+
+import FileLog
+
+from constants import _DATA_DIR
+from constants import _DATETIME_FORMAT
+from constants import _CACHE_FILENAME
+
+
+_LOG_FILE = 'Util.log'
 
 
 def get_graph_output_dir(output_dir):
@@ -15,6 +25,46 @@ def get_graph_output_dir(output_dir):
   graph_dir += output_dir
   ensure_dir_exist(graph_dir)
   return graph_dir
+
+
+def get_data_dir_name_for(month):
+  """Returns the data directory name for the given month."""
+  year = '2011'
+  if month == '01':
+    year = '2012'
+  return '%s/%s_%s' % (_DATA_DIR, year, month)
+
+
+def load_cache():
+  """Loads a mapping of short urls to long urls.
+  
+  Returns:
+  cache -- A dictionary mapping short urls to long urls.
+  """
+  log('Loading cache...')
+  cache = {}
+  with open(_CACHE_FILENAME) as input_file:
+    for line in input_file:
+      tokens = line.split('\t')
+      short_url = tokens[0]
+      long_url = tokens[1]
+      cache[short_url] = long_url
+  return cache
+
+
+def load_seeds():
+  """Loads the set of seed times for urls from file."""
+  log('Loading seeds.')
+  seeds = {}
+  with open('../data/FolkWisdom/seed_times.tsv') as input_file:
+    for line in input_file:
+      tokens = line.split('\t')
+      seed_tweet_id = tokens[0]
+      seed_user_id = tokens[1]
+      seed_time = datetime.strptime(tokens[2], _DATETIME_FORMAT)
+      url = tokens[3].strip()
+      seeds[url] = (seed_tweet_id, seed_user_id, seed_time)
+  return seeds
 
 
 def load_pickle(input_pickle_filename):
@@ -107,3 +157,10 @@ def gen_log_sequence(max_number):
     return num_list
         
         
+def log(message):
+  """Helper method to modularize the format of log messages.
+    
+    Keyword Arguments:
+    message -- A string to print.
+  """  
+  FileLog.log(_LOG_FILE, message)
