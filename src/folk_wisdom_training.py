@@ -23,13 +23,13 @@ from constants import _TRAINING_SET_MONTHS
 _LOG_FILE = 'folk_wisdom_training.log'
 
 _CATEGORIES = []
-_CATEGORIES.append(None)
-# _CATEGORIES.append('world')
+# _CATEGORIES.append(None)
+_CATEGORIES.append('world')
 # _CATEGORIES.append('business')
 # _CATEGORIES.append('opinion')
-# _CATEGORIES.append('sports')
+_CATEGORIES.append('sports')
 # _CATEGORIES.append('us')
-# _CATEGORIES.append('technology')
+_CATEGORIES.append('technology')
 # _CATEGORIES.append('movies')
 
 

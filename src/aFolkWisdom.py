@@ -50,18 +50,18 @@ from constants import _DELTAS
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
 
-_SIZE_EXPERTS = .02
+_SIZE_EXPERTS = .10
 _SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
 
 _CATEGORIES = []
 # Comment categories in/out individually as needed.
 _CATEGORIES.append(None)
-# _CATEGORIES.append('world')
+_CATEGORIES.append('world')
 # _CATEGORIES.append('business')
 # _CATEGORIES.append('opinion')
-# _CATEGORIES.append('sports')
+_CATEGORIES.append('sports')
 # _CATEGORIES.append('us')
-# _CATEGORIES.append('technology')
+_CATEGORIES.append('technology')
 # _CATEGORIES.append('movies')
 
 
@@ -554,11 +554,40 @@ def run():
       for rank, (url, count) in enumerate(expert_ci_rankings):
         ci_url_to_rank[url] = rank
 
+      market_precisions, market_recalls = calc_precision_recall(gt_rankings,
+                                                                market_rankings)
+      (newsaholic_precisions,
+       newsaholic_recalls) = calc_precision_recall(gt_rankings,
+                                                   newsaholic_rankings)
+      active_precisions, active_recalls = calc_precision_recall(gt_rankings,
+                                                                active_rankings)
+      common_precisions, common_recalls = calc_precision_recall(gt_rankings,
+                                                                common_rankings)
+      (expert_p_precisions,
+       expert_p_recalls) = calc_precision_recall(gt_rankings,
+                                                 expert_precision_rankings)
+      (expert_f_precisions,
+       expert_f_recalls) = calc_precision_recall(gt_rankings,
+                                                 expert_fscore_rankings)
+      (expert_c_precisions,
+       expert_c_recalls) = calc_precision_recall(gt_rankings,
+                                                 expert_ci_rankings)
+      (expert_s_precisions,
+       expert_s_recalls) = calc_precision_recall(gt_rankings,
+                                                 expert_s_rankings)
+
       mixed_rankings = mixed_model.get_mixed_rankings(market_url_to_rank,
+                                                      market_precisions,
                                                       precision_url_to_rank,
+                                                      expert_p_precisions,
                                                       fscore_url_to_rank,
+                                                      expert_f_precisions,
                                                       ci_url_to_rank,
+                                                      expert_c_precisions,
                                                       ground_truth_url_to_rank)
+
+      mixed_precisions, mixed_recalls = calc_precision_recall(gt_rankings, 
+                                                              mixed_rankings)
       
 
       log('-----------------------------------')
@@ -648,30 +677,26 @@ def run():
                             % (url.strip(), count, rank,
                             ground_truth_url_to_rank[url]))
 
-      market_precisions, market_recalls = calc_precision_recall(gt_rankings,
-                                                                market_rankings)
-      (newsaholic_precisions,
-       newsaholic_recalls) = calc_precision_recall(gt_rankings,
-                                                   newsaholic_rankings)
-      active_precisions, active_recalls = calc_precision_recall(gt_rankings,
-                                                                active_rankings)
-      common_precisions, common_recalls = calc_precision_recall(gt_rankings,
-                                                                common_rankings)
-      (expert_p_precisions,
-       expert_p_recalls) = calc_precision_recall(gt_rankings,
-                                                 expert_precision_rankings)
-      (expert_f_precisions,
-       expert_f_recalls) = calc_precision_recall(gt_rankings,
-                                                 expert_fscore_rankings)
-      (expert_c_precisions,
-       expert_c_recalls) = calc_precision_recall(gt_rankings,
-                                                 expert_ci_rankings)
-      (expert_s_precisions,
-       expert_s_recalls) = calc_precision_recall(gt_rankings,
-                                                 expert_s_rankings)
 
-      min_precisions, min_recalls = calc_precision_recall(gt_rankings, 
-                                                          mixed_rankings)
+      with open('../data/FolkWisdom/market_precisions_%s.txt'
+                % run_params_str, 'w') as out_file:
+        for precision in market_precisions:
+          out_file.write('%s\n' % precision)
+
+      with open('../data/FolkWisdom/expert_p_precisions_%s.txt'
+                % run_params_str, 'w') as out_file:
+        for precision in expert_p_precisions:
+          out_file.write('%s\n' % precision)
+
+      with open('../data/FolkWisdom/expert_f_precisions_%s.txt'
+                % run_params_str, 'w') as out_file:
+        for precision in expert_f_precisions:
+          out_file.write('%s\n' % precision)
+
+      with open('../data/FolkWisdom/expert_c_precisions_%s.txt'
+                % run_params_str, 'w') as out_file:
+        for precision in expert_c_precisions:
+          out_file.write('%s\n' % precision)
 
       log('Drawing summary precision-recall graphs...')
       draw_precision_recall_graph(market_precisions, market_recalls,
@@ -708,7 +733,7 @@ def run():
 
       log('Drawing mixed model precision-recall graph...')
       mixed_model.draw_precision_recall_mixed(market_precisions, market_recalls,
-                                              min_precisions, min_recalls,
+                                              mixed_precisions, mixed_recalls,
                                               run_params_str)
 
 

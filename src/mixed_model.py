@@ -5,8 +5,6 @@ __author = 'Chris Moghbel (cmoghbel@cs.ucla.edu)
 """
 import Util
 
-import sys
-
 import matplotlib
 matplotlib.use("Agg")
 from matplotlib.ticker import MultipleLocator
@@ -64,8 +62,11 @@ def draw_precision_recall_mixed(market_precisions, market_recalls,
   plt.close()
 
 
-def get_mixed_rankings(market_url_to_rank, precision_url_to_rank,
-                       fscore_url_to_rank, ci_url_to_rank, gt_url_to_rank):
+def get_mixed_rankings(market_url_to_rank, market_precisions,
+                       precision_url_to_rank, expert_p_precisions,
+                       fscore_url_to_rank, expert_f_precisions,
+                       ci_url_to_rank, expert_c_precisions,
+                       gt_url_to_rank):
   """Finds ranking based on min ranking of 4 rankings sets.
 
   Ground truths rankings are used to break ties.
@@ -86,28 +87,36 @@ def get_mixed_rankings(market_url_to_rank, precision_url_to_rank,
   urls = urls.union(fscore_url_to_rank.keys())
   urls = urls.union(ci_url_to_rank.keys())
 
-  mixed_rank_to_url_list = {}
+  mixed_error_to_url_list = {}
   for url in urls:
-    market_rank = sys.maxint
-    precision_rank = sys.maxint
-    fscore_rank = sys.maxint
-    ci_rank = sys.maxint
+    market_error = 100.0
+    precision_error = 100.0
+    fscore_error = 100.0
+    ci_error = 100.0
     if url in market_url_to_rank:
       market_rank = market_url_to_rank[url]
+      if market_rank <= len(market_precisions):
+        market_error = 100.0 - market_precisions[market_rank - 1]
     if url in precision_url_to_rank:
       precision_rank = precision_url_to_rank[url]
+      if precision_rank <= len(expert_p_precisions):
+        precision_error = 100.0 - expert_p_precisions[precision_rank - 1]
     if url in fscore_url_to_rank:
       fscore_rank = fscore_url_to_rank[url]
+      if fscore_rank <= len(expert_f_precisions):
+        fscore_error = 100.0 - expert_f_precisions[fscore_rank - 1]
     if url in ci_url_to_rank:
       ci_rank = ci_url_to_rank[url]
-    mixed_rank = min(market_rank, precision_rank, fscore_rank, ci_rank)
+      if ci_rank <= len(expert_c_precisions):
+        ci_error = 100.0 - expert_c_precisions[ci_rank - 1]
+    mixed_error = min(market_error, precision_error, fscore_error, ci_error)
     gt_rank = gt_url_to_rank[url]
-    if mixed_rank in mixed_rank_to_url_list:
-      mixed_rank_to_url_list[mixed_rank].append((url, gt_rank))
+    if mixed_error in mixed_error_to_url_list:
+      mixed_error_to_url_list[mixed_error].append((url, gt_rank))
     else:
-      mixed_rank_to_url_list[mixed_rank] = [(url, gt_rank), ]
+      mixed_error_to_url_list[mixed_error] = [(url, gt_rank), ]
 
-  rankings = break_ties(mixed_rank_to_url_list)
+  rankings = break_ties(mixed_error_to_url_list)
   return rankings
 
 

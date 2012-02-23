@@ -33,8 +33,7 @@ _DATA_DIR = '/dfs/birch/tsv'
 _CACHE_FILENAME = '/dfs/birch/tsv/URLExapnd.cache.txt'
 _DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
-# _DELTAS = [1, 4, 8]
-_DELTAS = [4, ]
+_DELTAS = [1, 4, 8]
 
 _TRAINING_SET_MONTHS = ['09', '10']
 _TESTING_SET_MONTHS = ['11', '12']
