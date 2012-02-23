@@ -30,7 +30,10 @@ __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 import FileLog
 import Util
 
-import sys
+import experts
+import basic_groups
+import mixed_model
+import ground_truths
 
 import matplotlib
 matplotlib.use("Agg")
@@ -39,49 +42,26 @@ from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
 import matplotlib.axis
 
-from datetime import datetime
-from datetime import timedelta
 import math
 from math import sqrt
 
-
-_BETA = 2
-
-_SIZE_EXPERTS = .02
-_SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
-
-_HITS_MISSES_FILE_USER_ID_INDEX = 0
-_HITS_MISSES_FILE_HITS_INDEX = 1
-_HITS_MISSES_FILE_MISSES_INDEX = 2
-
-_USER_ACTIVITY_FILE_ID_INDEX = 0
-_USER_ACTIVITY_FILE_COUNT_INDEX = 1
-
-_TIMEDELTAS_FILE_TWEET_ID_INDEX = 0
-_TIMEDELTAS_FILE_USER_ID_INDEX = 1 
-_TIMEDELTAS_FILE_DELTA_INDEX = 2
-_TIMEDELTAS_FILE_URL_INDEX = 3
-_TIMEDELTAS_FILE_CATEGORY_INDEX = 4
-
-_DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+from constants import _DELTAS
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
 
-_DELTAS = [] # Given in hours.
-_DELTAS.append(1)
-_DELTAS.append(4)
-_DELTAS.append(8)
+_SIZE_EXPERTS = .02
+_SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
 
 _CATEGORIES = []
 # Comment categories in/out individually as needed.
 _CATEGORIES.append(None)
-_CATEGORIES.append('world')
+# _CATEGORIES.append('world')
 # _CATEGORIES.append('business')
 # _CATEGORIES.append('opinion')
-_CATEGORIES.append('sports')
+# _CATEGORIES.append('sports')
 # _CATEGORIES.append('us')
-_CATEGORIES.append('technology')
+# _CATEGORIES.append('technology')
 # _CATEGORIES.append('movies')
 
 
@@ -157,7 +137,7 @@ def calc_precision_recall(gt_rankings, other_rankings):
 
 def draw_avg_diff_graph(newsaholic_diffs, market_diffs, active_diffs,
                         common_diffs, expert_p_diffs, expert_f_diffs,
-                        expert_c_diffs, expert_s_diffs, delta, category):
+                        expert_c_diffs, expert_s_diffs, run_params_str):
   """Draws the graph for avg diffs.
   
   Keyword Arguments:
@@ -170,35 +150,35 @@ def draw_avg_diff_graph(newsaholic_diffs, market_diffs, active_diffs,
   """
   plots = []
   figure = plt.figure()
-  ax = figure.add_subplot(111)
+  axs = figure.add_subplot(111)
 
-  market_plot = ax.plot([i for i in range(1, len(market_diffs) + 1)],
-                        market_diffs)
+  market_plot = axs.plot([i for i in range(1, len(market_diffs) + 1)],
+                         market_diffs)
   plots.append(market_plot)
 
-  newsaholic_plot = ax.plot([i for i in range(1, len(newsaholic_diffs) + 1)],
-                        newsaholic_diffs)
+  newsaholic_plot = axs.plot([i for i in range(1, len(newsaholic_diffs) + 1)],
+                         newsaholic_diffs)
   plots.append(newsaholic_plot)
 
-  active_plot = ax.plot([i for i in range(1, len(active_diffs) + 1)],
-                        active_diffs)
+  active_plot = axs.plot([i for i in range(1, len(active_diffs) + 1)],
+                         active_diffs)
   plots.append(active_plot)
 
-  common_plot = ax.plot([i for i in range(1, len(common_diffs) + 1)],
-                        common_diffs)
+  common_plot = axs.plot([i for i in range(1, len(common_diffs) + 1)],
+                         common_diffs)
   plots.append(common_plot)
 
-  expert_p_plot = ax.plot([i for i in range(1, len(expert_p_diffs) + 1)],
-                          expert_p_diffs)
+  expert_p_plot = axs.plot([i for i in range(1, len(expert_p_diffs) + 1)],
+                           expert_p_diffs)
   plots.append(expert_p_plot)
-  expert_f_plot = ax.plot([i for i in range(1, len(expert_f_diffs) + 1)],
-                          expert_f_diffs)
+  expert_f_plot = axs.plot([i for i in range(1, len(expert_f_diffs) + 1)],
+                           expert_f_diffs)
   plots.append(expert_f_plot)
-  expert_c_plot = ax.plot([i for i in range(1, len(expert_c_diffs) + 1)],
-                          expert_c_diffs)
+  expert_c_plot = axs.plot([i for i in range(1, len(expert_c_diffs) + 1)],
+                           expert_c_diffs)
   plots.append(expert_c_plot)
-  expert_s_plot = ax.plot([i for i in range(1, len(expert_s_diffs) + 1)],
-                          expert_s_diffs, '--')
+  expert_s_plot = axs.plot([i for i in range(1, len(expert_s_diffs) + 1)],
+                           expert_s_diffs, '--')
   plots.append(expert_s_plot)
 
 
@@ -213,20 +193,16 @@ def draw_avg_diff_graph(newsaholic_diffs, market_diffs, active_diffs,
   plt.axis([1, len(newsaholic_diffs) + 1, 0, max_y])
   plt.grid(True, which='major', linewidth=1)
 
-  ax.xaxis.set_minor_locator(MultipleLocator(100))
+  axs.xaxis.set_minor_locator(MultipleLocator(100))
   minor_locator = int(math.log(max_y))
   if minor_locator % 2 == 1:
     minor_locator += 1
-  ax.yaxis.set_minor_locator(MultipleLocator(minor_locator))
+  axs.yaxis.set_minor_locator(MultipleLocator(minor_locator))
   plt.grid(True, which='minor')
 
   plt.xlabel('Top X Stories Compared')
   plt.ylabel('Average Differnce in Ranking')
-  plt.title('Ranking Performance by User Group with %s Hour Delta (%s)'
-             % (delta, category))
 
-  run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
-                                       int(_SIZE_EXPERTS * 100), category)
   with open(_GRAPH_DIR + run_params_str + '/ranking_performance_%s.png'
             % run_params_str, 'w') as graph:
     plt.savefig(graph, format='png')
@@ -234,8 +210,6 @@ def draw_avg_diff_graph(newsaholic_diffs, market_diffs, active_diffs,
             % run_params_str, 'w') as graph:
     plt.savefig(graph, format='eps')
 
-  log('Outputted graph: Ranking Performance by User Group with '
-      '%s Hour Delta (%s)' % (delta, category))
   plt.close()
 
 
@@ -247,7 +221,7 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
                                 expert_f_precisions, expert_f_recalls,
                                 expert_c_precisions, expert_c_recalls,
                                 expert_s_precisions, expert_s_recalls,
-                                delta, category):
+                                run_params_str):
   """Draws the precision recall graph for all the user groups and a given delta.
 
   Keyword Arguments:
@@ -260,34 +234,34 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
   """
   plots = []
   figure = plt.figure()
-  ax = figure.add_subplot(111)
+  axs = figure.add_subplot(111)
 
-  market_plot = ax.plot(market_recalls, market_precisions)
+  market_plot = axs.plot(market_recalls, market_precisions)
   plots.append(market_plot)
 
   # Groups
-  newsaholic_plot = ax.plot(newsaholic_recalls, newsaholic_precisions, '--',
-                            linewidth=2)
+  newsaholic_plot = axs.plot(newsaholic_recalls, newsaholic_precisions, '--',
+                             linewidth=2)
   plots.append(newsaholic_plot)
-  active_plot = ax.plot(active_recalls, active_precisions, ':',
-                        linewidth=2)
+  active_plot = axs.plot(active_recalls, active_precisions, ':',
+                         linewidth=2)
   plots.append(active_plot)
-  common_plot = ax.plot(common_recalls, common_precisions, '-.',
-                        linewidth=2)
+  common_plot = axs.plot(common_recalls, common_precisions, '-.',
+                         linewidth=2)
   plots.append(common_plot)
 
   # Experts
-  expert_p_plot = ax.plot(expert_p_recalls, expert_p_precisions, '--',
-                          linewidth=2)
+  expert_p_plot = axs.plot(expert_p_recalls, expert_p_precisions, '--',
+                           linewidth=2)
   plots.append(expert_p_plot)
-  expert_f_plot = ax.plot(expert_f_recalls, expert_f_precisions, '-.',
-                          linewidth=2)
+  expert_f_plot = axs.plot(expert_f_recalls, expert_f_precisions, '-.',
+                           linewidth=2)
   plots.append(expert_f_plot)
-  expert_c_plot = ax.plot(expert_c_recalls, expert_c_precisions, ':',
-                          linewidth=2)
+  expert_c_plot = axs.plot(expert_c_recalls, expert_c_precisions, ':',
+                           linewidth=2)
   plots.append(expert_c_plot)
-  expert_s_plot = ax.plot(expert_s_recalls, expert_s_precisions, ':',
-                          linewidth=2)
+  expert_s_plot = axs.plot(expert_s_recalls, expert_s_precisions, ':',
+                           linewidth=2)
   plots.append(expert_s_plot)
 
   labels = ['Market',
@@ -304,15 +278,13 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
   plt.axis([0, max_x + 5, 0, 105])
   plt.grid(True, which='major', linewidth=1)
 
-  ax.xaxis.set_minor_locator(MultipleLocator(5))
-  ax.yaxis.set_minor_locator(MultipleLocator(5))
+  axs.xaxis.set_minor_locator(MultipleLocator(5))
+  axs.yaxis.set_minor_locator(MultipleLocator(5))
   plt.grid(True, which='minor')
 
   plt.xlabel('Recall (%)')
   plt.ylabel('Precision (%)')
 
-  run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
-                                       int(_SIZE_EXPERTS * 100), category)
   with open(_GRAPH_DIR + run_params_str + '/precision_recall_all_%s.png'
             % run_params_str, 'w') as graph:
     plt.savefig(graph, format='png')
@@ -320,627 +292,7 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
             % run_params_str, 'w') as graph:
     plt.savefig(graph, format='eps')
 
-  log('Outputted graph: Precision vs Recall for Groups and Experts with '
-      '%s Hour Delta (%s)' % (delta, category))
   plt.close()
-
-
-def draw_precision_recall_graph_experts(market_precisions, market_recalls,
-                                        expert_p_precisions, expert_p_recalls,
-                                        expert_f_precisions, expert_f_recalls,
-                                        expert_c_precisions, expert_c_recalls,
-                                        delta, category):
-  """Draws the precision recall graph for all the user groups and a given delta.
-
-  Keyword Arguments:
-  Requires two lists, one of precision values and one of recal values, for each
-  user group from the following: market, newsaholics, active users,
-  common users, and experts (precision, F-score, confidence interval, super).
-  This accounts for 8 user groups, meaning 16 lists in all.
-  delta -- The number of hours of the time window in which votes were counted.
-  category -- The category we are analyzing.
-  """
-  plots = []
-  figure = plt.figure()
-  ax = figure.add_subplot(111)
-
-  market_plot = ax.plot(market_recalls, market_precisions)
-  plots.append(market_plot)
-
-  expert_p_plot = ax.plot(expert_p_recalls, expert_p_precisions, '--',
-                          linewidth=2)
-  plots.append(expert_p_plot)
-  expert_f_plot = ax.plot(expert_f_recalls, expert_f_precisions, '-.',
-                          linewidth=2)
-  plots.append(expert_f_plot)
-  expert_c_plot = ax.plot(expert_c_recalls, expert_c_precisions, ':',
-                          linewidth=2)
-  plots.append(expert_c_plot)
-
-  labels = ['Market', 'Experts (Precision)', 'Experts (F-score)',
-            'Experts (CI)',]
-  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
-
-  max_x = max([max(market_recalls), max(expert_p_recalls),
-               max(expert_f_recalls), max(expert_c_recalls),])
-  plt.axis([0, max_x + 5, 0, 105])
-  plt.grid(True, which='major', linewidth=1)
-
-  ax.xaxis.set_minor_locator(MultipleLocator(5))
-  ax.yaxis.set_minor_locator(MultipleLocator(5))
-  plt.grid(True, which='minor')
-
-  plt.xlabel('Recall (%)')
-  plt.ylabel('Precision (%)')
-
-  run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
-                                       int(_SIZE_EXPERTS * 100), category)
-  with open(_GRAPH_DIR + run_params_str + '/precision_recall_experts_%s.png'
-            % run_params_str, 'w') as graph:
-    plt.savefig(graph, format='png')
-  with open(_GRAPH_DIR + run_params_str + '/precision_recall_experts_%s.eps'
-            % run_params_str, 'w') as graph:
-    plt.savefig(graph, format='eps')
-
-  log('Outputted graph: Precision vs Recall by Expert Group with '
-      '%s Hour Delta (%s)' % (delta, category))
-  plt.close()
-
-
-def draw_precision_recall_graph_groups(market_precisions, market_recalls,
-                                       newsaholic_precisions,
-                                       newsaholic_recalls, active_precisions,
-                                       active_recalls, common_precisions,
-                                       common_recalls, delta, category):
-  """Draws the precision recall graph for all the user groups and a given delta.
-
-  Keyword Arguments:
-  Requires two lists, one of precision values and one of recal values, for each
-  user group from the following: market, newsaholics, active users,
-  common users, and experts (precision, F-score, confidence interval, super).
-  This accounts for 8 user groups, meaning 16 lists in all.
-  delta -- The number of hours of the time window in which votes were counted.
-  category -- The category we are analyzing.
-  """
-  plots = []
-  figure = plt.figure()
-  ax = figure.add_subplot(111)
-
-  market_plot = ax.plot(market_recalls, market_precisions)
-  plots.append(market_plot)
-
-  newsaholic_plot = ax.plot(newsaholic_recalls, newsaholic_precisions, '--',
-                            linewidth=2)
-  plots.append(newsaholic_plot)
-
-  active_plot = ax.plot(active_recalls, active_precisions, ':',
-                        linewidth=2)
-  plots.append(active_plot)
-
-  common_plot = ax.plot(common_recalls, common_precisions, '-.',
-                        linewidth=2)
-  plots.append(common_plot)
-
-
-  labels = ['Market', 'News-aholics', 'Active Users', 'Common Users',]
-  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
-
-  max_x = max([max(market_recalls), max(newsaholic_recalls),
-               max(active_recalls), max(common_recalls)])
-  plt.axis([0, max_x + 5, 0, 105])
-  plt.grid(True, which='major', linewidth=1)
-
-  ax.xaxis.set_minor_locator(MultipleLocator(5))
-  ax.yaxis.set_minor_locator(MultipleLocator(5))
-  plt.grid(True, which='minor')
-
-  plt.xlabel('Recall (%)')
-  plt.ylabel('Precision (%)')
-
-  run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
-                                       int(_SIZE_EXPERTS * 100), category)
-  with open(_GRAPH_DIR + run_params_str + '/precision_recall_groups_%s.png'
-            % run_params_str, 'w') as graph:
-    plt.savefig(graph, format='png')
-  with open(_GRAPH_DIR + run_params_str + '/precision_recall_groups_%s.eps'
-            % run_params_str, 'w') as graph:
-    plt.savefig(graph, format='eps')
-
-  log('Outputted graph: Precision vs Recall by User Group with '
-      '%s Hour Delta (%s)' % (delta, category))
-  plt.close()
-
-
-def draw_precision_recall_graph_mixed(market_precisions, market_recalls,
-                                      mixed_precisions, mixed_recalls,
-                                      delta, category):
-  """Draws the precision recall graph for all the user groups and a given delta.
-
-  Keyword Arguments:
-  Requires two lists, one of precision values and one of recal values, for each
-  user group from the following: market, newsaholics, active users,
-  common users, and experts (precision, F-score, confidence interval, super).
-  This accounts for 8 user groups, meaning 16 lists in all.
-  delta -- The number of hours of the time window in which votes were counted.
-  category -- The category we are analyzing.
-  """
-  plots = []
-  figure = plt.figure()
-  ax = figure.add_subplot(111)
-
-  market_plot = ax.plot(market_recalls, market_precisions, '--')
-  plots.append(market_plot)
-
-  mixed_plot = ax.plot(mixed_recalls, mixed_precisions)
-  plots.append(mixed_plot)
-
-
-  labels = ['Market', 'Mixed (Min)',]
-  plt.legend(plots, labels, loc=0)
-
-  max_x = max([max(market_recalls), max(mixed_recalls),])
-  plt.axis([0, max_x + 5, 0, 105])
-  plt.grid(True, which='major', linewidth=1)
-
-  ax.xaxis.set_minor_locator(MultipleLocator(5))
-  ax.yaxis.set_minor_locator(MultipleLocator(5))
-  plt.grid(True, which='minor')
-
-  plt.xlabel('Recall (%)')
-  plt.ylabel('Precision (%)')
-
-  run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
-                                       int(_SIZE_EXPERTS * 100), category)
-  with open(_GRAPH_DIR + run_params_str + '/precision_recall_mixed_%s.png'
-            % run_params_str, 'w') as graph:
-    plt.savefig(graph, format='png')
-  with open(_GRAPH_DIR + run_params_str + '/precision_recall_mixed_%s.eps'
-            % run_params_str, 'w') as graph:
-    plt.savefig(graph, format='eps')
-
-  log('Outputted graph: Precision vs Recall for Mixed with '
-      '%s Hour Delta (%s)' % (delta, category))
-  plt.close()
-
-
-def gather_tweet_counts(hours, seeds, newsaholics, active, experts_precision,
-                        experts_fscore, experts_ci, super_experts,
-                        category=None):
-  """Gathers the tweet counts for a given set of months.
-  
-  Only counts votes if they occur within the given time delta from the seed
-  time (except for the ground truth rankings).
-  
-  Keyword Arguments:
-  hours -- The number of hours from the seed time in which to accept votes.
-  seeds -- A dictionary of url to the datetime of it first being seend
-  Accepts a parameter for a set defining each of the following user groups:
-  newsaholics, active users, experts (precision), experts (F-score),
-  experts (confidence interval), and experts (super experts).
-  category -- The category to gather tweets for, None if for all news.
-
-  Returns:
-  Dictionary of url to tweet count for all user groups. This includes:
-  ground truth, market, newsaholic, active users, common users, and
-  experts (precision, F-score, confidence interval, and super).
-  """
-  market_tweet_counts = {}
-  newsaholic_tweet_counts = {}
-  active_tweet_counts = {}
-  common_tweet_counts = {}
-  experts_precision_tc = {}
-  experts_fscore_tc = {}
-  experts_ci_tc = {}
-  experts_s_tc = {}
-  with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
-    for line in input_file:
-      tokens = line.split('\t')
-      url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
-      user_id = tokens[_TIMEDELTAS_FILE_USER_ID_INDEX]
-      time_delta = timedelta(seconds=int(tokens[_TIMEDELTAS_FILE_DELTA_INDEX]))
-      max_delta = timedelta.max
-      if hours:
-        max_delta = timedelta(hours=hours)
-
-      if url in seeds:
-        seed_time = seeds[url]
-        if is_in_testing_set(seed_time):
-
-
-          if time_delta < max_delta:
-
-
-            category_matches = True
-            if category:
-              category_matches = False
-              url_category = tokens[_TIMEDELTAS_FILE_CATEGORY_INDEX].strip()
-              if url_category == category:
-                category_matches = True
-             
-            if category_matches:
-
-              # Market
-              if url in market_tweet_counts:
-                market_tweet_counts[url] += 1
-              else:
-                market_tweet_counts[url] = 1
-
-              # Other groups
-              if user_id in newsaholics:
-                if url in newsaholic_tweet_counts:
-                  newsaholic_tweet_counts[url] += 1
-                else:
-                  newsaholic_tweet_counts[url] = 1
-              elif user_id in active:
-                if url in active_tweet_counts:
-                  active_tweet_counts[url] += 1
-                else:
-                  active_tweet_counts[url] = 1                
-              else:
-                if url in common_tweet_counts:
-                  common_tweet_counts[url] += 1
-                else:
-                  common_tweet_counts[url] = 1                
-              
-              if user_id in experts_precision:
-                if url in experts_precision_tc:
-                  experts_precision_tc[url] += 1
-                else:
-                  experts_precision_tc[url] = 1
-
-              if user_id in experts_fscore:
-                if url in experts_fscore_tc:
-                  experts_fscore_tc[url] += 1
-                else:
-                  experts_fscore_tc[url] = 1
-
-              if user_id in experts_ci:
-                if url in experts_ci_tc:
-                  experts_ci_tc[url] += 1
-                else:
-                  experts_ci_tc[url] = 1
-
-              if user_id in super_experts:
-                if url in experts_s_tc:
-                  experts_s_tc[url] += 1
-                else:
-                  experts_s_tc[url] = 1
-
-                
-  return (market_tweet_counts, newsaholic_tweet_counts, active_tweet_counts,
-          common_tweet_counts, experts_precision_tc, experts_fscore_tc,
-          experts_ci_tc, experts_s_tc)
-
-
-def get_min_rankings(market_url_to_rank, precision_url_to_rank,
-                     fscore_url_to_rank, ci_url_to_rank, gt_url_to_rank):
-  """Finds ranking based on min ranking of 4 rankings sets.
-
-  Ground truths rankings are used to break ties.
-
-  Keyword Arguments:
-  market_url_to_rank -- Dictionary from url to market ranking.
-  precision_url_to_rank -- Dictionary from url to precision expert rankings.
-  fscore_url_to_rank -- Dictionary from url to fscore expert rankings.
-  ci_url_to_rank -- Dictionary from url to ci expert rankings.
-  gt_url_to_rank -- Dictionary from url to ground truth ranking.
-
-  Returns:
-  mixed_rankings -- A list of (url, count) pairs representing the rankings.
-  """
-  log('Getting mixed (min) rankings...')
-  urls = set()
-  urls = urls.union(market_url_to_rank.keys())
-  urls = urls.union(precision_url_to_rank.keys())
-  urls = urls.union(fscore_url_to_rank.keys())
-  urls = urls.union(ci_url_to_rank.keys())
-
-  mixed_rank_to_url_list = {}
-  for url in urls:
-    market_rank = sys.maxint
-    precision_rank = sys.maxint
-    fscore_rank = sys.maxint
-    ci_rank = sys.maxint
-    if url in market_url_to_rank:
-      market_rank = market_url_to_rank[url]
-    if url in precision_url_to_rank:
-      precision_rank = precision_url_to_rank[url]
-    if url in fscore_url_to_rank:
-      fscore_rank = fscore_url_to_rank[url]
-    if url in ci_url_to_rank:
-      ci_rank = ci_url_to_rank[url]
-    mixed_rank = min(market_rank, precision_rank, fscore_rank, ci_rank)
-    gt_rank = gt_url_to_rank[url]
-    if mixed_rank in mixed_rank_to_url_list:
-      mixed_rank_to_url_list[mixed_rank].append((url, gt_rank))
-    else:
-      mixed_rank_to_url_list[mixed_rank] = [(url, gt_rank),]
-
-  rankings = break_ties(mixed_rank_to_url_list)
-  return rankings
-
-def break_ties(mixed_rank_to_url_list):
-  """Breaks ties in rank when finding rankings for mixed model.
-
-  Keyword Argument:
-  mixed_rank_to_url_list -- A dictionary from rank to a list of
-                            (url, count) pairs for that rank.
-
-  Returns:
-  rankings - A list of (url, count) pairs representing the ranking w/ ties
-             broken.
-  """
-  log('Breaking ties...')
-  prelim_rankings = sorted(mixed_rank_to_url_list.items(), key=lambda x: x[0])
-  rankings = []
-  for _, urls in prelim_rankings:
-    urls_sorted = sorted(urls, key=lambda x: x[1])
-    for url in urls_sorted:
-      rankings.append(url)
-  return rankings
-
-
-def get_rankings(delta, seeds, newsaholics, active_users, experts_precision,
-                 experts_fscore, experts_ci, super_experts, category=None):
-  """Gets the true rankings, and ranking as determined by various user groups.
-  
-  Keyword Arguments:
-  delta -- The time window, in hours.
-  seeds -- The url to first time seen dictionary.
-  Accepts a user of user ids for each of the following user groups:
-  newsaholics, active users, experts (precision, f-score, confidnce
-  interval, and super).
-  category -- The category to get rankings for, None for all news.
-  
-  Returns:
-  Returns rankings for the following user groups:
-  market, newsaholics, active users, common userse, experts (precision,
-  f-score, confidence interval, super).
-  """
-  log('Getting Rankings')
-  (mtc, etc, atc, ctc,
-   eptc, eftc, ecitc, setc) = gather_tweet_counts(delta, seeds, newsaholics,
-                                                  active_users,
-                                                  experts_precision,
-                                                  experts_fscore,
-                                                  experts_ci, super_experts,
-                                                  category)
-  market_rankings = sorted(mtc.items(), key=lambda x: x[1], reverse=True)
-  newsaholic_rankings = sorted(etc.items(), key=lambda x: x[1], reverse=True)
-  active_rankings = sorted(atc.items(), key=lambda x: x[1], reverse=True)
-  common_rankings = sorted(ctc.items(), key=lambda x: x[1], reverse=True)
-  expert_precision_rankings = sorted(eptc.items(), key=lambda x: x[1],
-                                     reverse=True)
-  expert_fscore_rankings = sorted(eftc.items(), key=lambda x: x[1],
-                                  reverse=True)
-  expert_ci_rankings = sorted(ecitc.items(), key=lambda x: x[1], reverse=True)
-  expert_s_rankings = sorted(setc.items(), key=lambda x: x[1], reverse=True)
-  return (market_rankings, newsaholic_rankings, active_rankings,
-          common_rankings, expert_precision_rankings, expert_fscore_rankings,
-          expert_ci_rankings, expert_s_rankings)
-
-
-def get_gt_rankings(seeds, category=None):
-  """Generate the ground truth rankings.
-  
-  Keyword Arguments:
-  seeds -- Dictionary of url to first time seen.
-  category -- Category to generate ground truths for, None for all news.
-
-  Returns:
-  gt_rankings -- A list of (url, count) pairs in ranked order.
-  """
-  log('Getting ground truth rankings.')
-  gt_tweet_counts = {}
-  with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
-    for line in input_file:
-      tokens = line.split('\t')
-      url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
-      if url in seeds:
-        seed_time = seeds[url]
-        if is_in_testing_set(seed_time):
-          if category:
-            url_category = tokens[_TIMEDELTAS_FILE_CATEGORY_INDEX].strip()
-            if url_category == category:
-              if url in gt_tweet_counts:
-                gt_tweet_counts[url] += 1
-              else:
-                gt_tweet_counts[url] = 1
-          else:
-            if url in gt_tweet_counts:
-              gt_tweet_counts[url] += 1
-            else:
-              gt_tweet_counts[url] = 1
-
-  gt_rankings = sorted(gt_tweet_counts.items(), key=lambda x: x[1],
-                       reverse=True)
-  return gt_rankings
-
-
-def select_experts_confidence_interval(num_users, delta, category=None):
-  """Selects a set of experts via confidence interval strategy.
-
-  Keyword Arguments:
-  num_users -- The size of the total number of users.
-  category -- The category to find experts for, None if for all news.
-
-  Returns:
-  experts -- A set of experts chosen by confidence interval method
-             for given category.
-  """
-  users = {}
-  input_file = ('../data/FolkWisdom/user_hits_and_misses_%s_%s.tsv'
-                % (delta, category))
-
-  with open(input_file) as input_file:
-    log('Selecting experts via CI method for delta %s and cateogry %s.'
-        % (delta, category))
-    for line in input_file:
-      tokens = line.split('\t')
-      user_id = tokens[_HITS_MISSES_FILE_USER_ID_INDEX]
-      # num_users += 1
-      hits = int(tokens[_HITS_MISSES_FILE_HITS_INDEX])
-      misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
-      trials = hits + misses
-      p = float(hits + 2) / (trials + 4)
-      error = 1.96 * sqrt((p * (1 - p)) / float(trials + 4))
-      low = max(0.0, p - error)
-      high = min(1.0, p + error)
-      avg_of_ci = (low + high) / 2.0
-      users[user_id] = avg_of_ci
-  users_sorted = sorted(users.items(), key=lambda x: x[1], reverse=True)
-  num_experts_to_select = int(num_users * _SIZE_EXPERTS)
-  experts = set()
-  for i in range(0, num_experts_to_select):
-    user_id, _ = users_sorted[i]
-    experts.add(user_id)
-  return experts
-
-
-def select_experts_fscore(size_target_news, num_users, delta, category=None):
-  """Selects a set of experts via F-score strategy.
-
-  Keyword Arguments:
-  num_users -- The size of the total number of users.
-  category -- The category to find experts for, None if for all news.
-
-  Returns:
-  experts -- A set of experts chosen by F-score method
-             for given category.
-  """
-  users = {}
-  input_file = ('../data/FolkWisdom/user_hits_and_misses_%s_%s.tsv'
-                % (delta, category))
-
-  with open(input_file) as input_file:
-    log('Selecting experts via F_score method for delta %s and category %s.'
-        % (delta, category))
-    for line in input_file:
-      tokens = line.split('\t')
-      user_id = tokens[_HITS_MISSES_FILE_USER_ID_INDEX]
-      hits = int(tokens[_HITS_MISSES_FILE_HITS_INDEX])
-      misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
-      precision = float(hits) / (hits + misses)
-      recall = float(hits) / size_target_news
-      f_score = (1 + _BETA**2)
-      # Make sure to do this only if we will have a non-zero denominator.
-      if not precision == 0 or not recall == 0:
-        f_score *= ((precision * recall) / ((_BETA**2 * precision) + recall))
-      else:
-        f_score = 0.0
-      users[user_id] = f_score
-  users_sorted = sorted(users.items(), key=lambda x: x[1], reverse=True)
-  num_experts_to_select = int(num_users * _SIZE_EXPERTS)
-  experts = set()
-  for i in range(0, num_experts_to_select):
-    user_id, _ = users_sorted[i]
-    experts.add(user_id)
-  return experts
-
-
-def select_experts_precision(valid_users, num_users, delta, category=None):
-  """Selects a set of experts via precision strategy.
-
-  Keyword Arguments:
-  num_users -- The size of the total number of users.
-  category -- The category to find experts for, None if for all news.
-
-  Returns:
-  experts -- A set of experts chosen by precision method
-             for given category.
-  """
-  users = {}
-  input_file = ('../data/FolkWisdom/user_hits_and_misses_%s_%s.tsv'
-                % (delta, category))
-
-  with open(input_file) as input_file:
-    log('Selecting experts via precision method for delta %s and category %s.'
-        % (delta, category))
-    for line in input_file:
-      tokens = line.split('\t')
-      user_id = tokens[_HITS_MISSES_FILE_USER_ID_INDEX]
-      # num_users += 1
-      if user_id in valid_users:
-        hits = int(tokens[_HITS_MISSES_FILE_HITS_INDEX])
-        misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
-        precision = float(hits) / (hits + misses)
-        users[user_id] = (precision, hits + misses)
-  us_secondary = sorted(users.items(), key=lambda x: x[1][1], reverse=True)
-  users_sorted = sorted(us_secondary, key=lambda x: x[1][0], reverse=True)
-  log('Num Users (2): %s' % len(users_sorted))
-  num_experts_to_select = int(num_users * _SIZE_EXPERTS)
-  experts = set()
-  for i in range(0, num_experts_to_select):
-    user_id, _ = users_sorted[i]
-    experts.add(user_id)
-  return experts
-
-
-def group_users(delta, category=None):
-  """Groups users into 'newsaholic', 'active', and 'common' categories.
-  
-  Returns:
-  num_users -- The overall total number of users.
-  newsaholics -- A python set of user ids for newsaholic users, defined as
-  users in top 2% of users as ranked by activity.
-  active_users -- A python set of user ids for active users, defined as users
-  in between 2% and 25% of users as ranked by activity.
-  common_users -- A python set of user ids for common users, defined as users
-  whose rank is lower the 25% as ranked by activity.
-  """
-  log('Grouping Users')
-  user_ids_sorted = []
-  input_file = '../data/FolkWisdom/user_activity_%s_%s.tsv' % (delta, category)
-  with open(input_file) as input_file:
-    for line in input_file:
-      tokens = line.split('\t')
-      user_id = tokens[_USER_ACTIVITY_FILE_ID_INDEX]
-      user_ids_sorted.append(user_id)
-  num_users = len(user_ids_sorted)
-  log('Num users (grouping): %s' % num_users)
-  two_percent = int(num_users * .02)
-  twenty_five_percent = int(num_users * .25)
-  
-  newsaholics = set()
-  active_users = set()
-  common_users = set()
-  for i in range(num_users):
-    user_id = user_ids_sorted[i]
-    if i <= two_percent:
-      newsaholics.add(user_id)
-    elif i <= twenty_five_percent:
-      active_users.add(user_id)
-    else:
-      common_users.add(user_id)
-  return num_users, newsaholics, active_users, common_users
-
-
-def load_seeds():
-  """Loads the set of seed times for urls from file."""
-  log('Loading seeds.')
-  seeds = {}
-  with open('../data/FolkWisdom/seed_times.tsv') as input_file:
-    for line in input_file:
-      tokens = line.split('\t')
-      url = tokens[3].strip()
-      seed_time = datetime.strptime(tokens[2], _DATETIME_FORMAT)
-      seeds[url] = seed_time
-  return seeds
-
-
-def is_in_testing_set(date_time):
-  """Checks where a datetime is within the testing set.
-
-  Keyword Arguments:
-  date_time: A datetime object.
-
-  Returns:
-  True if the datetime object is within the testing set window, False otherwise.
-  """
-  if (date_time >= datetime(year=2011, month=11, day=1)
-      and date_time < datetime(year=2012, month=1, day=1)):
-    return True
-  return False
 
 
 def run():
@@ -948,59 +300,70 @@ def run():
   global _SIZE_TOP_NEWS
   FileLog.set_log_dir()
 
-  seeds = load_seeds()
+  seeds = Util.load_seeds()
   for category in _CATEGORIES:
+    log('Preforming analysis for category: %s' % category)
     if category:
       _SIZE_TOP_NEWS = .10
     else:
       _SIZE_TOP_NEWS = .02
 
-    log('Preforming analysis for category: %s' % category)
-    gt_rankings = get_gt_rankings(seeds, category)
+    gt_rankings = ground_truths.get_gt_rankings(seeds, False, category)
     log('Num ground_truth_rankings: %s' % len(gt_rankings))
+
+    # Format for use later.
     ground_truth_url_to_rank = {}
     for rank, (url, count) in enumerate(gt_rankings):
       ground_truth_url_to_rank[url] = rank
-    size_target_news = int(len(gt_rankings) * _SIZE_TOP_NEWS)
-    log('Size target_news: %s' % size_target_news)
+
+
+    target_news = ground_truths.find_target_news(gt_rankings, _SIZE_TOP_NEWS)
+    log('Size target_news: %s' % len(target_news))
 
     for delta in _DELTAS:
-      num_users, newsaholics, active_users, common_users = group_users(delta,
-                                                                       category)
+      run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
+                                           int(_SIZE_EXPERTS * 100), category)
+      info_output_dir = '../graph/FolkWisdom/%s/info/' % run_params_str
+      Util.ensure_dir_exist(info_output_dir)
+
+      (num_users, newsaholics,
+       active_users, common_users) = basic_groups.group_users(delta, category)
       log('Num newsaholics: %s' % len(newsaholics))
       log('Num active: %s' % len(active_users))
       log('Num common: %s' % len(common_users))
 
-      experts_precision = select_experts_precision(
-          newsaholics.union(active_users), num_users, delta, category)
-      experts_fscore = select_experts_fscore(size_target_news, num_users,
-                                             delta, category)
-      experts_ci = select_experts_confidence_interval(num_users, delta,
-                                                      category)
-      super_experts = experts_precision.intersection(
-          experts_fscore).intersection(experts_ci)
+      experts_precision = experts.select_experts_precision(
+          newsaholics.union(active_users), num_users, delta, _SIZE_EXPERTS,
+          category)
+      experts_fscore = experts.select_experts_fscore(len(target_news),
+                                                     num_users,
+                                                     delta, _SIZE_EXPERTS,
+                                                     category)
+      experts_ci = experts.select_experts_ci(num_users, delta, _SIZE_EXPERTS,
+                                             category)
+      super_experts = experts.select_super_experts(experts_precision,
+                                                   experts_fscore,
+                                                   experts_ci)
 
       log('Num experts (precision): %s' % len(experts_precision))
       log('Num experts (fscore): %s' % len(experts_fscore))
       log('Num experts (ci): %s' % len(experts_ci))
       log('Num Super Experts: %s' %len(super_experts))
 
-      run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
-                                           int(_SIZE_EXPERTS * 100), category)
-      info_output_dir = '../graph/FolkWisdom/%s/info/' % run_params_str
-      Util.ensure_dir_exist(info_output_dir)
 
       log('Finding rankings with an %s hour delta.' % delta)
-      (market_rankings, newsaholic_rankings, active_rankings,
-      common_rankings, expert_precision_rankings, expert_fscore_rankings,
-      expert_ci_rankings, expert_s_rankings) = get_rankings(delta, seeds, 
-                                                            newsaholics,
-                                                            active_users,
-                                                            experts_precision,
-                                                            experts_fscore,
-                                                            experts_ci,
-                                                            super_experts,
-                                                            category)
+      (market_rankings, newsaholic_rankings,
+       active_rankings,
+       common_rankings) = basic_groups.get_rankings(delta, seeds, newsaholics,
+                                                    active_users, category)
+      (expert_precision_rankings, expert_fscore_rankings,
+       expert_ci_rankings,
+       expert_s_rankings) = experts.get_rankings(delta, seeds,
+                                                 experts_precision,
+                                                 experts_fscore,
+                                                 experts_ci,
+                                                 super_experts,
+                                                 category)
 
 
 
@@ -1082,7 +445,7 @@ def run():
                           % (num_votes_newsaholics + num_votes_active
                              + num_votes_common))
         output_file.write('\n')
-        output_file.write('Total Number of Good News: %s\n' % size_target_news)
+        output_file.write('Total Number of Good News: %s\n' % len(target_news))
 
       log('Ground Truth Top 5')
       for i in range(min(len(gt_rankings), 5)):
@@ -1155,7 +518,7 @@ def run():
         expert_s_rank_to_url[rank] = url
 
       avg_diffs_newsaholic = calculate_diff_avg(ground_truth_url_to_rank,
-                                            newsaholic_rank_to_url)
+                                                newsaholic_rank_to_url)
       avg_diffs_market = calculate_diff_avg(ground_truth_url_to_rank,
                                             market_rank_to_url)
       avg_diffs_active = calculate_diff_avg(ground_truth_url_to_rank,
@@ -1175,8 +538,8 @@ def run():
       draw_avg_diff_graph(avg_diffs_newsaholic, avg_diffs_market,
                           avg_diffs_active, avg_diffs_common,
                           avg_diffs_expert_p, avg_diffs_expert_f,
-                          avg_diffs_expert_c, avg_diffs_expert_s, delta,
-                          category)
+                          avg_diffs_expert_c, avg_diffs_expert_s,
+                          run_params_str)
 
       market_url_to_rank = {}
       precision_url_to_rank = {}
@@ -1191,23 +554,23 @@ def run():
       for rank, (url, count) in enumerate(expert_ci_rankings):
         ci_url_to_rank[url] = rank
 
-      min_rankings = get_min_rankings(market_url_to_rank,
-                                      precision_url_to_rank,
-                                      fscore_url_to_rank,
-                                      ci_url_to_rank,
-                                      ground_truth_url_to_rank)
+      mixed_rankings = mixed_model.get_mixed_rankings(market_url_to_rank,
+                                                      precision_url_to_rank,
+                                                      fscore_url_to_rank,
+                                                      ci_url_to_rank,
+                                                      ground_truth_url_to_rank)
       
 
       log('-----------------------------------')
       log('Mixed (min) Top 5')
-      for i in range(min(len(min_rankings), 5)):
-        url, count = min_rankings[i]
+      for i in range(min(len(mixed_rankings), 5)):
+        url, count = mixed_rankings[i]
         log('[%s] %s\t%s' %(i + 1, url, count))
       log('-----------------------------------')
 
       with open('%sranking_comparisons_%s.tsv'
                 % (info_output_dir, run_params_str), 'w') as out_file:
-        for gt_rank, (gt_url, gt_count) in enumerate(gt_rankings):
+        for gt_rank, (gt_url, _) in enumerate(gt_rankings):
           market_rank = 0
           precision_rank = 0
           ci_rank = 0
@@ -1278,9 +641,9 @@ def run():
           output_file.write('%s\t%s\t(%s,%s)\n'
                             % (url.strip(), count, rank,
                             ground_truth_url_to_rank[url]))
-      with open('%smin_rankings_%s.tsv'
+      with open('%smixed_rankings_%s.tsv'
                 % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(min_rankings):
+        for rank, (url, count) in enumerate(mixed_rankings):
           output_file.write('%s\t%s\t(%s,%s)\n'
                             % (url.strip(), count, rank,
                             ground_truth_url_to_rank[url]))
@@ -1308,35 +671,45 @@ def run():
                                                  expert_s_rankings)
 
       min_precisions, min_recalls = calc_precision_recall(gt_rankings, 
-                                                          min_rankings)
+                                                          mixed_rankings)
 
+      log('Drawing summary precision-recall graphs...')
       draw_precision_recall_graph(market_precisions, market_recalls,
-                                         newsaholic_precisions,
-                                         newsaholic_recalls,
-                                         active_precisions, active_recalls,
-                                         common_precisions, common_recalls,
-                                         expert_p_precisions, expert_p_recalls,
-                                         expert_f_precisions, expert_f_recalls,
-                                         expert_c_precisions, expert_c_recalls,
-                                         expert_s_precisions, expert_s_recalls,
-                                         delta, category)
+                                  newsaholic_precisions,
+                                  newsaholic_recalls,
+                                  active_precisions, active_recalls,
+                                  common_precisions, common_recalls,
+                                  expert_p_precisions, expert_p_recalls,
+                                  expert_f_precisions, expert_f_recalls,
+                                  expert_c_precisions, expert_c_recalls,
+                                  expert_s_precisions, expert_s_recalls,
+                                  run_params_str)
 
-      draw_precision_recall_graph_experts(market_precisions, market_recalls,
-                                          expert_p_precisions, expert_p_recalls,
-                                          expert_f_precisions, expert_f_recalls,
-                                          expert_c_precisions, expert_c_recalls,
-                                          delta, category)
+      log('Drawing experts precision-recall graph...')
+      experts.draw_precision_recall_experts(market_precisions, market_recalls,
+                                            expert_p_precisions,
+                                            expert_p_recalls,
+                                            expert_f_precisions,
+                                            expert_f_recalls,
+                                            expert_c_precisions,
+                                            expert_c_recalls,
+                                            run_params_str)
 
-      draw_precision_recall_graph_groups(market_precisions, market_recalls,
-                                         newsaholic_precisions,
-                                         newsaholic_recalls,
-                                         active_precisions, active_recalls,
-                                         common_precisions, common_recalls,
-                                         delta, category)
+      log('Drawing basic groups precision-recall graph...')
+      basic_groups.draw_precision_recall_groups(market_precisions,
+                                                market_recalls,
+                                                newsaholic_precisions,
+                                                newsaholic_recalls,
+                                                active_precisions,
+                                                active_recalls,
+                                                common_precisions,
+                                                common_recalls,
+                                                run_params_str)
 
-      draw_precision_recall_graph_mixed(market_precisions, market_recalls,
-                                        min_precisions, min_recalls,
-                                        delta, category)
+      log('Drawing mixed model precision-recall graph...')
+      mixed_model.draw_precision_recall_mixed(market_precisions, market_recalls,
+                                              min_precisions, min_recalls,
+                                              run_params_str)
 
 
 def log(message):

@@ -7,12 +7,12 @@ __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 import Util
 import URLUtil
 import FileLog
+import ground_truths
 
 import os
 from datetime import datetime
 from datetime import timedelta
 
-from constants import _TIMEDELTAS_FILE_URL_INDEX
 from constants import _TWEETFILE_USER_ID_INDEX
 from constants import _TWEETFILE_CREATED_AT_INDEX
 from constants import _TWEETFILE_TWEET_TEXT_INDEX
@@ -20,51 +20,18 @@ from constants import _DATETIME_FORMAT
 from constants import _DELTAS
 from constants import _TRAINING_SET_MONTHS
 
-_LOG_FILE = 'DataUtils.log'
+_LOG_FILE = 'folk_wisdom_training.log'
 
 _CATEGORIES = []
-# _CATEGORIES.append(None)
+_CATEGORIES.append(None)
 # _CATEGORIES.append('world')
-_CATEGORIES.append('business')
-_CATEGORIES.append('opinion')
-_CATEGORIES.append('sports')
-_CATEGORIES.append('us')
+# _CATEGORIES.append('business')
+# _CATEGORIES.append('opinion')
+# _CATEGORIES.append('sports')
+# _CATEGORIES.append('us')
 # _CATEGORIES.append('technology')
-_CATEGORIES.append('movies')
+# _CATEGORIES.append('movies')
 
-def get_gt_rankings(seeds, category=None):
-  """Generate the ground truth rankings.
-  
-  Keyword Arguments:
-  seeds -- A dictionary of url to first time seen.
-  category -- The category to get gt's for, None for all news.
-
-  Returns:
-  gt_rankings -- A list of (url, count) pairs in ranked order.
-  """
-  gt_tweet_counts = {}
-  with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
-    for line in input_file:
-      tokens = line.split('\t')
-      url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
-      if url in seeds:
-        _, _, seed_time = seeds[url]
-        if is_in_training_set(seed_time):
-          category_matches = True
-          if category:
-            category_matches = False
-            url_category = URLUtil.extract_category(url)
-            if url_category == category:
-              category_matches = True
-          if category_matches:
-            if url in gt_tweet_counts:
-              gt_tweet_counts[url] += 1
-            else:
-              gt_tweet_counts[url] = 1
-
-  gt_rankings = sorted(gt_tweet_counts.items(), key=lambda x: x[1],
-                       reverse=True)
-  return gt_rankings
 
 
 def find_hits_and_mises(months, target_news, seeds, cache, delta,
@@ -178,47 +145,6 @@ def sort_users_by_tweet_count(months, seeds, cache, delta, category=None):
   log('Wrote users (sorted by activity) to disk') 
 
 
-def log(message):
-  """Helper method to modularize the format of log messages.
-    
-    Keyword Arguments:
-    message -- A string to print.
-  """  
-  FileLog.log(_LOG_FILE, message)
-
-
-def find_target_news(gt_rankings):
-  """Find the target news, which is top 2% of ground truth.
-  
-  Keyword Arguments:
-  seeds -- The first time each url was seen.
-  category -- The category to generate target news for, None if for all news.
-
-  Returns:
-  target_news -- A set of target news for the given category.
-  """
-  num_news = int(len(gt_rankings) * .02)
-  target_news = set()
-  for i in range(0, num_news):
-    url, _ = gt_rankings[i]
-    target_news.add(url)
-  return target_news
-
-
-def is_in_training_set(date_time):
-  """Checks if the given datetime is within the training set.
-
-  Keyword Arguments:
-  date_time -- A datetime object.
-
-  Returns: True if the datetime is within the training set window.
-  """
-  if (date_time >= datetime(year=2011, month=9, day=1)
-      and date_time < datetime(year=2011, month=11, day=1)):
-    return True
-  return False
-
-
 def run():
   """Main logic. Outputs data in format for further analysis."""
   cache = Util.load_cache()
@@ -226,14 +152,23 @@ def run():
 
   for delta in _DELTAS:
     for category in _CATEGORIES:
-      gt_rankings = get_gt_rankings(seeds, category)
+      gt_rankings = ground_truths.get_gt_rankings(seeds, True, category)
       sort_users_by_tweet_count(_TRAINING_SET_MONTHS, seeds, cache,
                                 delta, category)
-      target_news = find_target_news(gt_rankings)
+      target_news = ground_truths.find_target_news(gt_rankings, .02)
       find_hits_and_mises(_TRAINING_SET_MONTHS, target_news, seeds, cache,
                           delta, category)
 
   log('Finished outputting data!')
+
+
+def log(message):
+  """Helper method to modularize the format of log messages.
+    
+    Keyword Arguments:
+    message -- A string to print.
+  """  
+  FileLog.log(_LOG_FILE, message)
 
 
 if __name__ == "__main__":

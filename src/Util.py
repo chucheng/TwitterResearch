@@ -67,6 +67,35 @@ def load_seeds():
   return seeds
 
 
+def is_in_testing_set(date_time):
+  """Checks where a datetime is within the testing set.
+
+  Keyword Arguments:
+  date_time: A datetime object.
+
+  Returns:
+  True if the datetime object is within the testing set window, False otherwise.
+  """
+  if (date_time >= datetime(year=2011, month=11, day=1)
+      and date_time < datetime(year=2012, month=1, day=1)):
+    return True
+  return False
+
+
+def is_in_training_set(date_time):
+  """Checks if the given datetime is within the training set.
+
+  Keyword Arguments:
+  date_time -- A datetime object.
+
+  Returns: True if the datetime is within the training set window.
+  """
+  if (date_time >= datetime(year=2011, month=9, day=1)
+      and date_time < datetime(year=2011, month=11, day=1)):
+    return True
+  return False
+
+
 def load_pickle(input_pickle_filename):
     """Load a pickle and return"""
     inputfile = open(input_pickle_filename, 'r')
