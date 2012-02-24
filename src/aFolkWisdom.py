@@ -213,6 +213,65 @@ def draw_avg_diff_graph(newsaholic_diffs, market_diffs, active_diffs,
   plt.close()
 
 
+def draw_precision_graph(market_precisions, newsaholic_precisions,
+                         active_precisions, common_precisions,
+                         expert_p_precisions, expert_f_precisions,
+                         expert_c_precisions, expert_s_precisions,
+                         run_params_str):
+  """Draws the precision recall graph for all the user groups and a given delta.
+
+  Plots the given list of precisions against the number of top news that the
+  precision value was calculated for.
+  """
+  plots = []
+  figure = plt.figure()
+  axs = figure.add_subplot(111)
+
+  market_plot = axs.plot(market_precisions)
+  plots.append(market_plot)
+
+  # Groups
+  newsaholic_plot = axs.plot(newsaholic_precisions, '--', linewidth=2)
+  plots.append(newsaholic_plot)
+  active_plot = axs.plot(active_precisions, ':', linewidth=2)
+  plots.append(active_plot)
+  common_plot = axs.plot(common_precisions, '-.', linewidth=2)
+  plots.append(common_plot)
+
+  # Experts
+  expert_p_plot = axs.plot(expert_p_precisions, '--', linewidth=2)
+  plots.append(expert_p_plot)
+  expert_f_plot = axs.plot(expert_f_precisions, '-.', linewidth=2)
+  plots.append(expert_f_plot)
+  expert_c_plot = axs.plot(expert_c_precisions, ':', linewidth=2)
+  plots.append(expert_c_plot)
+  expert_s_plot = axs.plot(expert_s_precisions, ':', linewidth=2)
+  plots.append(expert_s_plot)
+
+  labels = ['Market',
+            'News-aholics', 'Active Users', 'Common Users',
+            'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)',
+            'Super Experts']
+  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
+
+  plt.grid(True, which='major', linewidth=1)
+
+  axs.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Recall (%)')
+  plt.ylabel('Num Top News Picked')
+
+  with open(_GRAPH_DIR + run_params_str + '/precision_all_%s.png'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + run_params_str + '/precision_all_%s.eps'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  plt.close()
+
+
 def draw_precision_recall_graph(market_precisions, market_recalls,
                                 newsaholic_precisions, newsaholic_recalls,
                                 active_precisions, active_recalls,
@@ -710,6 +769,13 @@ def run():
                                   expert_s_precisions, expert_s_recalls,
                                   run_params_str)
 
+      log('Drawing summary precision-topnews graphs...')
+      draw_precision_graph(market_precisions, newsaholic_precisions,
+                           active_precisions, common_precisions,
+                           expert_p_precisions, expert_f_precisions,
+                           expert_c_precisions, expert_s_precisions,
+                           run_params_str)
+
       log('Drawing experts precision-recall graph...')
       experts.draw_precision_recall_experts(market_precisions, market_recalls,
                                             expert_p_precisions,
@@ -719,6 +785,11 @@ def run():
                                             expert_c_precisions,
                                             expert_c_recalls,
                                             run_params_str)
+
+      log('Drawing experts precision-topnews graph...')
+      experts.draw_precision_experts(market_precisions, expert_p_precisions,
+                                     expert_f_precisions, expert_c_precisions,
+                                     run_params_str)
 
       log('Drawing basic groups precision-recall graph...')
       basic_groups.draw_precision_recall_groups(market_precisions,
@@ -731,11 +802,21 @@ def run():
                                                 common_recalls,
                                                 run_params_str)
 
+      log('Drawing basic groups precision-topnews graph...')
+      basic_groups.draw_precision_groups(market_precisions,
+                                         newsaholic_precisions,
+                                         active_precisions,
+                                         common_precisions,
+                                         run_params_str)
+
       log('Drawing mixed model precision-recall graph...')
       mixed_model.draw_precision_recall_mixed(market_precisions, market_recalls,
                                               mixed_precisions, mixed_recalls,
                                               run_params_str)
 
+      log('Drawing mixed model precision-topnews graph...')
+      mixed_model.draw_precision_mixed(market_precisions, mixed_precisions,
+                                       run_params_str)
 
 def log(message):
   """Helper method to modularize the format of log messages.

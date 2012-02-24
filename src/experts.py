@@ -28,6 +28,50 @@ _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _BETA = 2
 
 
+def draw_precision_experts(market_precisions, expert_p_precisions,
+                           expert_f_precisions, expert_c_precisions,
+                           run_params_str):
+  """Draws the precision recall graph for all the user groups and a given delta.
+
+  Plots the given list of precisions against the number of top news that the
+  precision value was calculated for.
+  """
+  plots = []
+  figure = plt.figure()
+  axs = figure.add_subplot(111)
+
+  market_plot = axs.plot(market_precisions)
+  plots.append(market_plot)
+
+  expert_p_plot = axs.plot(expert_p_precisions, '--', linewidth=2)
+  plots.append(expert_p_plot)
+  expert_f_plot = axs.plot(expert_f_precisions, '-.', linewidth=2)
+  plots.append(expert_f_plot)
+  expert_c_plot = axs.plot(expert_c_precisions, ':', linewidth=2)
+  plots.append(expert_c_plot)
+
+  labels = ['Market', 'Experts (Precision)', 'Experts (F-score)',
+            'Experts (CI)',]
+  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
+
+  plt.grid(True, which='major', linewidth=1)
+
+  axs.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Num Top News Picked')
+  plt.ylabel('Precision (%)')
+
+  with open(_GRAPH_DIR + run_params_str + '/precision_experts_%s.png'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + run_params_str + '/precision_experts_%s.eps'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  plt.close()
+
+
 def draw_precision_recall_experts(market_precisions, market_recalls,
                                   expert_p_precisions, expert_p_recalls,
                                   expert_f_precisions, expert_f_recalls,

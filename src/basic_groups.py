@@ -23,6 +23,52 @@ from constants import _USER_ACTIVITY_FILE_ID_INDEX
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 
 
+def draw_precision_groups(market_precisions, newsaholic_precisions,
+                                 active_precisions, common_precisions,
+                                 run_params_str):
+  """Draws the precision recall graph for all the user groups and a given delta.
+
+  Plots the given list of precisions against the number of top news that the
+  precision value was calculated for.
+  """
+  plots = []
+  figure = plt.figure()
+  axs = figure.add_subplot(111)
+
+  market_plot = axs.plot(market_precisions)
+  plots.append(market_plot)
+
+  newsaholic_plot = axs.plot(newsaholic_precisions, '--', linewidth=2)
+  plots.append(newsaholic_plot)
+
+  active_plot = axs.plot(active_precisions, ':', linewidth=2)
+  plots.append(active_plot)
+
+  common_plot = axs.plot(common_precisions, '-.', linewidth=2)
+  plots.append(common_plot)
+
+
+  labels = ['Market', 'News-aholics', 'Active Users', 'Common Users', ]
+  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
+
+  plt.grid(True, which='major', linewidth=1)
+
+  axs.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Num Top News Picked')
+  plt.ylabel('Precision (%)')
+
+  with open(_GRAPH_DIR + run_params_str + '/precision_groups_%s.png'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + run_params_str + '/precision_groups_%s.eps'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  plt.close()
+
+
 def draw_precision_recall_groups(market_precisions, market_recalls,
                                  newsaholic_precisions,
                                  newsaholic_recalls, active_precisions,

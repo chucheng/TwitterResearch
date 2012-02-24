@@ -14,6 +14,44 @@ import matplotlib.axis
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 
 
+def draw_precision_mixed(market_precisions, mixed_precisions, run_params_str):
+  """Draws the precision recall graph for all the user groups and a given delta.
+
+  Plots the given list of precisions against the number of top news that the
+  precision value was calculated for.
+  """
+  plots = []
+  figure = plt.figure()
+  axs = figure.add_subplot(111)
+
+  market_plot = axs.plot(market_precisions, '--')
+  plots.append(market_plot)
+
+  mixed_plot = axs.plot(mixed_precisions)
+  plots.append(mixed_plot)
+
+
+  labels = ['Market', 'Mixed', ]
+  plt.legend(plots, labels, loc=0)
+
+  plt.grid(True, which='major', linewidth=1)
+
+  axs.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Recall (%)')
+  plt.ylabel('Num Top News Picked')
+
+  with open(_GRAPH_DIR + run_params_str + '/precision_mixed_%s.png'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + run_params_str + '/precision_mixed_%s.eps'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  plt.close()
+
+
 def draw_precision_recall_mixed(market_precisions, market_recalls,
                                 mixed_precisions, mixed_recalls,
                                 run_params_str):
