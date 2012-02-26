@@ -111,7 +111,7 @@ def draw_graph(aggregates, aggregates_top):
   all_plot = axs.semilogx(_AGGREGATE_HOURS, aggregates)
   plots.append(all_plot)
 
-  top_plot = axs.semilogx(_AGGREGATE_HOURS, aggregates_top, '--', linewidth=2)
+  top_plot = axs.semilogx(_AGGREGATE_HOURS, aggregates_top, 'r--', linewidth=3)
   plots.append(top_plot)
 
   labels = ['All News', 'Top News']
@@ -120,7 +120,7 @@ def draw_graph(aggregates, aggregates_top):
   plt.grid(True, which='major', linewidth=2)
 
   plt.xlabel('Hours')
-  plt.ylabel('Percentage Stories Inactive')
+  plt.ylabel('Inactive News Threads (%)')
 
   with open(_GRAPH_DIR + 'tweet_lifespan.png', 'w') as graph:
     plt.savefig(graph, format='png')
