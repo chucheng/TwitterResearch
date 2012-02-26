@@ -39,8 +39,8 @@ def draw_precision_mixed(market_precisions, mixed_precisions, run_params_str):
   axs.yaxis.set_minor_locator(MultipleLocator(5))
   plt.grid(True, which='minor')
 
-  plt.xlabel('Recall (%)')
-  plt.ylabel('Num Top News Picked')
+  plt.xlabel('Num Top News Picked')
+  plt.ylabel('Precision (%)')
 
   with open(_GRAPH_DIR + run_params_str + '/precision_mixed_%s.png'
             % run_params_str, 'w') as graph:
