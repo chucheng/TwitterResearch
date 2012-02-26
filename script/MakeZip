@@ -1,0 +1,11 @@
+#!/bin/sh
+# This is a script for generating zip file
+
+rm ~/chris_graph.zip
+SRCDIR=/home/cmoghbel/Code/TwitterResearch
+zip -r ~/chris_graph.zip $SRCDIR/graph/ActiveUsers -x $SRCDIR/graph/ActiveUsers/backup*
+zip -r ~/chris_graph.zip $SRCDIR/graph/TweetLifespan -x $SRCDIR/graph/TweetLifespan/backup*
+cd $SRCDIR/graph/FolkWisdom
+find . -iname *.eps |grep -v backup|xargs zip ~/chris_graph.zip
+find . -iname *.png |grep -v backup|xargs zip ~/chris_graph.zip
+find . -iname ranking_comparisons*.tsv | grep -v backup| xargs zip ~/chris_graph.zip 
