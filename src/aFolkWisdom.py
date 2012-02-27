@@ -182,7 +182,7 @@ def draw_avg_diff_graph(newsaholic_diffs, market_diffs, active_diffs,
   plots.append(expert_s_plot)
 
 
-  labels = ['Market', 'News-aholics', 'Active Users', 'Common Users',
+  labels = ['Market', 'News-addicted', 'Active Users', 'Common Users',
             'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)',
             'Super Experts']
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
@@ -249,7 +249,7 @@ def draw_precision_graph(market_precisions, newsaholic_precisions,
   plots.append(expert_s_plot)
 
   labels = ['Market',
-            'News-aholics', 'Active Users', 'Common Users',
+            'News-addicted', 'Active Users', 'Common Users',
             'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)',
             'Super Experts']
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
@@ -324,7 +324,7 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
   plots.append(expert_s_plot)
 
   labels = ['Market',
-            'News-aholics', 'Active Users', 'Common Users',
+            'News-addicted', 'Active Users', 'Common Users',
             'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)',
             'Super Experts']
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
