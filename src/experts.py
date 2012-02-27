@@ -59,8 +59,8 @@ def draw_precision_experts(market_precisions, expert_p_precisions,
   axs.yaxis.set_minor_locator(MultipleLocator(5))
   plt.grid(True, which='minor')
 
-  plt.xlabel('Num Top News Picked')
-  plt.ylabel('Precision (%)')
+  plt.xlabel('Num Top News Picked', fontsize='16')
+  plt.ylabel('Precision (%)', fontsize='16')
 
   with open(_GRAPH_DIR + run_params_str + '/precision_experts_%s.png'
             % run_params_str, 'w') as graph:
@@ -117,8 +117,8 @@ def draw_precision_recall_experts(market_precisions, market_recalls,
   axs.yaxis.set_minor_locator(MultipleLocator(5))
   plt.grid(True, which='minor')
 
-  plt.xlabel('Recall (%)')
-  plt.ylabel('Precision (%)')
+  plt.xlabel('Recall (%)', fontsize='16')
+  plt.ylabel('Precision (%)', fontsize='16')
 
   with open(_GRAPH_DIR + run_params_str + '/precision_recall_experts_%s.png'
             % run_params_str, 'w') as graph:
