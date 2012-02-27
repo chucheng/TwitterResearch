@@ -11,6 +11,7 @@ http://docs.python.org/library/configparser.html
 import ConfigParser 
 import socket
 import os
+import pwd
 
 def getConfig():
     """Read TwitterResearch.cfg and dynamically determine base dir by hostname.    
@@ -25,8 +26,8 @@ def getConfig():
     elif hostname == "shahin-desktop":
         project_base_dir = "/home/cmoghbel/Code/TwitterResearch/"
     elif hostname == "birch":
-        username = os.getusername();
-        if usename == "chucheng":
+        username = pwd.getpwuid( os.getuid() )[0]
+        if username == "chucheng":
             project_base_dir = "/home/chucheng/projects/github/TwitterResearch/"
         elif username == "cmoghbel":
             project_base_dir = "/home/cmoghbel/Code/TwitterResearch/"
