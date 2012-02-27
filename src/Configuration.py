@@ -26,7 +26,7 @@ def getConfig():
         project_base_dir = "/home/cmoghbel/Code/TwitterResearch/"
     elif hostname == "birch":
         username = os.getusername();
-        if usename == "chucheng"
+        if usename == "chucheng":
             project_base_dir = "/home/chucheng/projects/github/TwitterResearch/"
         elif username == "cmoghbel":
             project_base_dir = "/home/cmoghbel/Code/TwitterResearch/"
