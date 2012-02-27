@@ -41,7 +41,7 @@ import matplotlib.axis
 
 _DATA_DIR = '/dfs/birch/tsv'
 _YEAR = 2011
-_MONTHS = ['08', '09', '10', '11']
+_MONTHS = ['09', '10', '11', '12']
 
 _NUM_TOP_USERS_TO_OUTPUT = 100
 
@@ -191,7 +191,6 @@ def draw_active_users_graph(avg_num_tweets):
   plt.grid(True, which='minor')
   plt.xlabel('percentile')
   plt.ylabel('Average Number Tweets per Month')
-  plt.title('Average Number Tweets per Month by Percentile')
 
   with open(_GRAPH_DIR + 'num_avg_tweets.png', 'w') as graph:
     plt.savefig(graph, format='png')
@@ -223,7 +222,6 @@ def draw_percentage_change_graph(avg_change):
   plt.grid(True, which='minor')
   plt.xlabel('percentile')
   plt.ylabel('Average Percentage Change')
-  plt.title('Average Percentage Change in Activity by Percentile')
 
   with open(_GRAPH_DIR + 'percentage_change.png', 'w') as graph:
     plt.savefig(graph, format='png')
