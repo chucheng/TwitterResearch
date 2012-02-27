@@ -50,7 +50,7 @@ from constants import _DELTAS
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
 
-_SIZE_EXPERTS = .02
+_SIZE_EXPERTS = .10
 _SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
 
 _CATEGORIES = []
