@@ -8,4 +8,4 @@ rm ~/chris_graph.zip
 cd $SRCDIR/graph/
 find . -iname *.eps |grep -v backup|xargs zip ~/chris_graph.zip
 find . -iname *.png |grep -v backup|xargs zip ~/chris_graph.zip
-find . -iname user_demographics*.tsv | grep -v backup| xargs zip ~/chris_graph.zip 
+find . -iname user_demographics*.txt | grep -v backup| xargs zip ~/chris_graph.zip 

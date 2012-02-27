@@ -48,7 +48,7 @@ def draw_precision_groups(market_precisions, newsaholic_precisions,
   plots.append(common_plot)
 
 
-  labels = ['Market', 'News-aholics', 'Active Users', 'Common Users', ]
+  labels = ['Market', 'News-addicted', 'Active Users', 'Common Users', ]
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
 
   plt.grid(True, which='major', linewidth=1)
@@ -104,7 +104,7 @@ def draw_precision_recall_groups(market_precisions, market_recalls,
   plots.append(common_plot)
 
 
-  labels = ['Market', 'News-aholics', 'Active Users', 'Common Users', ]
+  labels = ['Market', 'News-addicted', 'Active Users', 'Common Users', ]
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
 
   max_x = max([max(market_recalls), max(newsaholic_recalls),
