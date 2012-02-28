@@ -37,7 +37,6 @@ matplotlib.use("Agg")
 
 from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
-import matplotlib.axis
 
 _DATA_DIR = '/dfs/birch/tsv'
 _YEAR = 2011
@@ -99,8 +98,8 @@ def calculate_avg_num_tweets(user_id_sorted_by_tweet_count):
   return avg_num_tweets
 
 
-def calculate_avg_change_in_activity(id_to_count_training, id_to_count_testing,
-                                     id_to_percentile):
+def calculate_avg_change_activity(id_to_count_training, id_to_count_testing,
+                                  id_to_percentile):
   """Calculates the avg change in activity for each percentile.
 
   Keyword Arguments:
@@ -135,9 +134,9 @@ def calculate_avg_change_in_activity(id_to_count_training, id_to_count_testing,
     num_tweets_training[i] /= (len(_MONTHS) * 1.0)
     num_tweets_testing[i] /= (len(_MONTHS) * 1.0) 
 
-    x = num_tweets_training[i] 
-    y = num_tweets_testing[i] 
-    change = (abs(y - x) / (x * 1.0)) * 100
+    training = num_tweets_training[i] 
+    testing = num_tweets_testing[i] 
+    change = (abs(testing - training) / (training * 1.0)) * 100
     avg_change[i] = change
   
   return avg_change
@@ -182,15 +181,15 @@ def draw_active_users_graph(avg_num_tweets):
   avg_num_tweets -- The data for this graph, as described above.
   """
   figure = plt.figure()
-  ax = figure.add_subplot(111)
-  myplt = ax.plot([i for i in range(1, 101)], avg_num_tweets)
+  axs = figure.add_subplot(111)
+  axs.plot([i for i in range(1, 101)], avg_num_tweets)
   plt.axis([0, 101, 0, avg_num_tweets[0] + 1])
   plt.grid(True, which='major', linewidth=2)
-  ax.xaxis.set_minor_locator(MultipleLocator(5))
-  ax.yaxis.set_minor_locator(MultipleLocator(5))
+  axs.xaxis.set_minor_locator(MultipleLocator(5))
+  axs.yaxis.set_minor_locator(MultipleLocator(5))
   plt.grid(True, which='minor')
-  plt.xlabel('percentile')
-  plt.ylabel('Average Number Tweets per Month')
+  plt.xlabel('percentile', fontsize='16')
+  plt.ylabel('Average Number Tweets per Month', fontsize='16')
 
   with open(_GRAPH_DIR + 'num_avg_tweets.png', 'w') as graph:
     plt.savefig(graph, format='png')
@@ -213,12 +212,12 @@ def draw_percentage_change_graph(avg_change):
   avg_num_tweets -- The data for this graph, as described above.
   """
   figure = plt.figure()
-  ax = figure.add_subplot(111)
-  myplt = ax.plot([i for i in range(1, 101)], avg_change)
+  axs = figure.add_subplot(111)
+  axs.plot([i for i in range(1, 101)], avg_change)
   plt.axis([0, 101, 0, avg_change[0] + .25])
   plt.grid(True, which='major', linewidth=2)
-  ax.xaxis.set_minor_locator(MultipleLocator(5))
-  ax.yaxis.set_minor_locator(MultipleLocator(1))
+  axs.xaxis.set_minor_locator(MultipleLocator(5))
+  axs.yaxis.set_minor_locator(MultipleLocator(1))
   plt.grid(True, which='minor')
   plt.xlabel('percentile')
   plt.ylabel('Average Percentage Change')
@@ -252,13 +251,13 @@ def gather_tweet_counts():
   id_to_count_training = {}
   id_to_count_testing = {}
   for month in _MONTHS:
-    print 'Parsing %s/%s' %(month, _YEAR)
-    training_dir = '%s/%s_%s' %(_DATA_DIR, _YEAR, month)
+    print 'Parsing %s/%s' % (month, _YEAR)
+    training_dir = '%s/%s_%s' % (_DATA_DIR, _YEAR, month)
     for filename in os.listdir(training_dir):
       if '.tweet' in filename and 'http_nyti_ms' in filename:
-        data_file = '%s/%s' %(training_dir, filename)
-        with open(data_file) as f:
-          for line in f:
+        data_file = '%s/%s' % (training_dir, filename)
+        with open(data_file) as in_file:
+          for line in in_file:
             tokens = line.split('\t')
             user_id = tokens[_TWEETFILE_USER_ID_INDEX]
             if user_id_to_tweet_count.has_key(user_id):
@@ -287,12 +286,13 @@ def output_top_users(user_id_sorted_by_tweet_count):
   user_id_sorted_by_tweet_count -- A list of user_id, tweet count tuples
                                    sorted by tweet counts.
   """
-  filename = '%stop_%s_active_users.tsv' %(_GRAPH_DIR, _NUM_TOP_USERS_TO_OUTPUT)
-  with open(filename, 'w') as f:
+  filename = '%stop_%s_active_users.tsv' % (_GRAPH_DIR,
+                                            _NUM_TOP_USERS_TO_OUTPUT)
+  with open(filename, 'w') as out_file:
     for i in range(_NUM_TOP_USERS_TO_OUTPUT):
       user_id, tweet_count = user_id_sorted_by_tweet_count[i]
-      line = '%s\t%s\n' %(user_id, tweet_count / (len(_MONTHS) * 1.0))
-      f.write(line)
+      line = '%s\t%s\n' % (user_id, tweet_count / (len(_MONTHS) * 1.0))
+      out_file.write(line)
 
 
 def run():
@@ -322,12 +322,12 @@ def run():
   
   id_to_percentile = calculate_user_percentile(user_id_sorted_by_tweet_count)
   
-  avg_changes = calculate_avg_change_in_activity(id_to_count_training,
-                                                 id_to_count_testing,
-                                                 id_to_percentile)
+  avg_changes = calculate_avg_change_activity(id_to_count_training,
+                                              id_to_count_testing,
+                                              id_to_percentile)
   
   draw_percentage_change_graph(avg_changes)
   
 
 if __name__ == "__main__":
-    run()
+  run()
