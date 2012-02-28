@@ -15,6 +15,13 @@ import sys
 
 from datetime import datetime
 
+import numpy as npy
+
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+
 from constants import _TIMEDELTAS_FILE_TWEET_ID_INDEX
 from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 
@@ -29,9 +36,53 @@ from constants import _WINDOW_MONTHS
 from constants import _DELTAS
 
 _SIZE_TOP_NEWS = .02
+_DELTA_FOR_GRAPH = 8
 
 _LOG_FILE = 'a_source_device.log'
 _OUTPUT_DIR = '../data/SourceDevice/'
+_GRAPH_DIR = Util.get_graph_output_dir('SourceDevice/')
+
+
+def draw_graph(nf_all, top_dict, delta_dict, param_str):
+  devices = []
+  no_filter = []
+  top = []
+  delta = []
+
+  for i in range(0, 5):
+    device, percent = nf_all[i]
+    devices.append(device)
+    no_filter.append(percent)
+
+  for device in devices:
+    percent_top = top_dict[device]
+    percent_delta = delta_dict[device]
+    top.append(percent_top)
+    delta.append(percent_delta)
+
+  fig = plt.figure()
+  axs = fig.add_subplot(111)
+  ind = npy.arange(5)
+  width = .15
+
+  rects1 = axs.bar(ind, no_filter, width, color='b', hatch='\\')
+  rects2 = axs.bar(ind + width, top, width, color='r', hatch='-')
+  rects3 = axs.bar(ind + 2. * width, delta, width, color='g', hatch='/')
+
+  axs.set_ylabel('Percentage')
+  axs.set_xticks(ind + width)
+  axs.set_xticklabels(devices)
+
+  axs.legend((rects1[0], rects2[0], rects3[0]),
+             ('All Tweets', 'Top Tweets',
+              'Tweets within %s hour delta' % _DELTA_FOR_GRAPH))
+
+  with open(_GRAPH_DIR + '/source_device_%s.png' % param_str, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + '/source_device_%s.eps' % param_str, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  plt.close()
 
 
 def find_device_counts(max_delta, deltas, top_news=None, cache=None):
@@ -184,6 +235,25 @@ def run():
       out_file.write('%s\t%s\t%s\t%s\n' % (device, count, percent_of_retweets,
                                              percent_tweets_retweets))
 
+  # We will need to save specific data for later to draw the graphs.
+  nf_all = []
+  nf_original = []
+  nf_retweet = []
+  top_dict_all = {}
+  top_dict_original = {}
+  top_dict_retweets = {}
+  delta_dict_all = {}
+  delta_dict_original = {}
+  delta_dict_retweet = {}
+  
+  # Need to format these!
+  for device, (count, percent) in sorted_all_counts:
+    top_dict_all[device] = percent
+  for device, (count, percent, percent2) in sorted_original_counts:
+    top_dict_original[device] = percent
+  for device, (count, percent, percent2) in sorted_retweet_counts:
+    top_dict_retweets[device] = percent
+
   # Do analysis w/ delta, including sys.max to do analysis with no delta.
   for delta in [sys.maxint] + _DELTAS:
     param_str = '_%s' % delta
@@ -199,6 +269,19 @@ def run():
     sorted_retweet_counts = sorted(retweet_counts.items(),
                                    key=lambda x: x[1][0],
                                    reverse=True)
+
+    # Format and save for later.
+    if delta == sys.maxint:
+      nf_all = [(dev, per) for dev, (_, per) in sorted_all_counts]
+      nf_original = [(dev, per) for dev, (_, per, _) in sorted_original_counts]
+      nf_retweet = [(dev, per) for dev, (_, per, _) in sorted_retweet_counts]
+    elif delta == _DELTA_FOR_GRAPH:
+      for device, (count, percent) in sorted_all_counts:
+        delta_dict_all[device] = percent
+      for device, (count, percent, percent2) in sorted_original_counts:
+        delta_dict_original[device] = percent
+      for device, (count, percent, percent2) in sorted_retweet_counts:
+        delta_dict_retweet[device] = percent
 
     with open(_OUTPUT_DIR + 'source_device_all%s.tsv' % param_str,
               'w') as out_file:
@@ -217,6 +300,16 @@ def run():
                    percent_tweets_retweets) in sorted_retweet_counts:
         out_file.write('%s\t%s\t%s\t%s\n' % (device, count, percent_of_retweets,
                                              percent_tweets_retweets))
+
+  log('Drawing all graph...')
+  draw_graph(nf_all, top_dict_all, delta_dict_all, 'all_%s' % _DELTA_FOR_GRAPH)
+  log('Drawing original graph...')
+  draw_graph(nf_original, top_dict_original, delta_dict_original,
+             'original_%s' % _DELTA_FOR_GRAPH)
+  log('Drawing retweets graph...')
+  draw_graph(nf_retweet, top_dict_retweets, delta_dict_retweet,
+             'retweets_%s' %_DELTA_FOR_GRAPH)
+
   log('Analysis complete.')
   
 
