@@ -96,6 +96,21 @@ def is_in_training_set(date_time):
   return False
 
 
+def is_in_window(date_time):
+  """Checks if the given datetime is within the desired window.
+
+  Keyword Arguments:
+  date_time -- The datetime object to take.
+  
+  Returns:
+  True if within the window, False otherwise.
+  """
+  if (date_time > datetime(year=2011, month=9, day=1) and
+      date_time < datetime(year=2012, month=1, day=1)):
+    return True
+  return False
+
+
 def load_pickle(input_pickle_filename):
     """Load a pickle and return"""
     inputfile = open(input_pickle_filename, 'r')

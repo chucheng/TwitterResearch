@@ -34,6 +34,7 @@ import experts
 import basic_groups
 import mixed_model
 import ground_truths
+from ground_truths import DataSet
 
 import matplotlib
 matplotlib.use("Agg")
@@ -367,7 +368,8 @@ def run():
     else:
       _SIZE_TOP_NEWS = .02
 
-    gt_rankings = ground_truths.get_gt_rankings(seeds, False, category)
+    gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TESTING,
+                                                category)
     log('Num ground_truth_rankings: %s' % len(gt_rankings))
 
     # Format for use later.

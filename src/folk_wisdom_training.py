@@ -8,6 +8,7 @@ import Util
 import URLUtil
 import FileLog
 import ground_truths
+from ground_truths import DataSet
 
 import os
 from datetime import datetime
@@ -152,7 +153,8 @@ def run():
 
   for delta in _DELTAS:
     for category in _CATEGORIES:
-      gt_rankings = ground_truths.get_gt_rankings(seeds, True, category)
+      gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TRAINING,
+                                                  category)
       sort_users_by_tweet_count(_TRAINING_SET_MONTHS, seeds, cache,
                                 delta, category)
       target_news = ground_truths.find_target_news(gt_rankings, .02)

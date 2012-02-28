@@ -26,7 +26,7 @@ def find_target_news(gt_rankings, size_top_news):
   return target_news
 
 
-def get_gt_rankings(seeds, training, category=None):
+def get_gt_rankings(seeds, dataset, category=None):
   """Generate the ground truth rankings.
   
   Keyword Arguments:
@@ -46,10 +46,12 @@ def get_gt_rankings(seeds, training, category=None):
       if url in seeds:
         _, _, seed_time = seeds[url]
         is_in_window = False
-        if training:
+        if dataset == DataSet.TRAINING:
           is_in_window = Util.is_in_training_set(seed_time)
-        else:
+        elif dataset == DataSet.TESTING:
           is_in_window = Util.is_in_testing_set(seed_time)
+        else:
+          is_in_window = True
         if is_in_window:
           category_matches = True
           if category:
@@ -66,3 +68,14 @@ def get_gt_rankings(seeds, training, category=None):
   gt_rankings = sorted(gt_tweet_counts.items(), key=lambda x: x[1],
                        reverse=True)
   return gt_rankings
+
+class DataSet:
+  """Enum for data set values."""
+
+  def __init__(self):
+    """Do nothing."""
+    pass
+
+  ALL = 0
+  TRAINING = 1
+  TESTING = 2
