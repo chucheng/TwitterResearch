@@ -12,6 +12,7 @@ from ground_truths import DataSet
 
 import os
 import sys
+import re
 
 from datetime import datetime
 
@@ -39,7 +40,7 @@ from constants import _WINDOW_MONTHS
 from constants import _DELTAS
 
 _SIZE_TOP_NEWS = .02
-_DELTA_FOR_GRAPH = 8
+_NUM_DEVICES = 7
 
 _REGENERATE_DATA = False
 _REDRAW_GRAPH = True
@@ -49,7 +50,7 @@ _OUTPUT_DIR = '../data/SourceDevice/'
 _GRAPH_DIR = Util.get_graph_output_dir('SourceDevice/')
 
 
-def draw_graph(nf_all, top_dict, delta_dict, param_str):
+def draw_graph(top_sorted, original_dict, retweet_dict, param_str):
   """Draws a graphical representation of this analysis.
 
   Draws three bars for each of the top 5 sources, as determined by
@@ -57,76 +58,78 @@ def draw_graph(nf_all, top_dict, delta_dict, param_str):
   delta.
 
   Keyword Arguments:
-  nf_all -- A list of (device, percent) pairs in sorted order, no filtering.
-  top_dict -- (Dictionary) Maps device to percent, filter by top news.
-  delta_dict -- (Dictionary) Maps device to percent, filter by delta.
+  top_sorted -- (List) (device, percent) pairs in sorted order, top tweets.
+  original_dict -- (Dictionary) Maps device to percent, filter by origin tweets.
+  retweet_dict -- (Dictionary) Maps device to percent, filter by retweets.
   """
   devices = []
-  no_filter = []
   top = []
-  delta = []
+  original = []
+  retweet = []
 
-  for i in range(0, 5):
-    device, percent = nf_all[i]
+  for i in range(0, _NUM_DEVICES):
+    device, percent = top_sorted[i]
     devices.append(device)
-    no_filter.append(percent)
+    top.append(percent)
 
   for device in devices:
-    percent_top = top_dict[device]
-    percent_delta = delta_dict[device]
-    top.append(percent_top)
-    delta.append(percent_delta)
+    percent_original = 0.0
+    percent_retweet = 0.0
+    if device in original_dict:
+      percent_original = original_dict[device]
+    if device in retweet_dict:
+      percent_retweet = retweet_dict[device]
+    original .append(percent_original)
+    retweet.append(percent_retweet)
+
+  devices = [re.sub(r'[^a-zA-Z0-9_\s]', '', device) for device in devices]
 
   fig = plt.figure()
   axs = fig.add_subplot(111)
-  ind = npy.arange(5)
+  ind = npy.arange(_NUM_DEVICES)
   width = .15
 
-  rects1 = axs.bar(ind, no_filter, width, color='w', hatch='\\')
-  rects2 = axs.bar(ind + width, top, width, color='w', hatch='--')
-  rects3 = axs.bar(ind + 2. * width, delta, width, color='w', hatch='/')
+  rects1 = axs.bar(ind, top, width, color='w', hatch='\\', edgecolor='red')
+  rects2 = axs.bar(ind + width, original, width, color='w',
+                   hatch='--', edgecolor='blue')
+  rects3 = axs.bar(ind + 2. * width, retweet, width, color='w',
+                   hatch='/', edgecolor='green')
 
   axs.set_ylabel('Percentage', fontsize='16')
   axs.set_xticks(ind + width)
-  axs.set_xticklabels(devices, rotation='10')
+  axs.set_xticklabels(devices, rotation='12')
 
   axs.legend((rects1[0], rects2[0], rects3[0]),
-             ('All Tweets', 'Top Tweets',
-              'Tweets within %s hour delta' % _DELTA_FOR_GRAPH))
+             ('Popular News', 'Origin Tweets', 'Retweets'))
 
-  with open(_GRAPH_DIR + '/source_device_%s.png' % param_str, 'w') as graph:
+  with open(_GRAPH_DIR + '/source_device%s.png' % param_str, 'w') as graph:
     plt.savefig(graph, format='png')
-  with open(_GRAPH_DIR + '/source_device_%s.eps' % param_str, 'w') as graph:
+  with open(_GRAPH_DIR + '/source_device%s.eps' % param_str, 'w') as graph:
     plt.savefig(graph, format='eps')
 
   plt.close()
 
 
-def find_device_counts(max_delta, deltas, top_news=None, cache=None):
+def find_device_counts(max_delta, deltas, top_news, cache):
   """Finds the number of tweets by each source device.
 
   * To achieve no filtering by delta, pass in sys.maxint.
-  * To filter for top news, pass top_news (Set), and cache (Dict)
-    mapping short_url to long_url.
 
   Returns:
   Dictionary of source device string to pair of (count, percentage).
-  e.g. {'Twitter for iPhone': (1100, 10.0) ...}
+  e.g. {'Twitter for iPhone': (1100, 10.0) ...} for all, top, origin,
+  and retweets.
   """
-  if top_news and not cache:
-    log('If top news is given, cache must be provided so we can parse urls')
-    exit()
   device_counts = {}
   all_count = 0
+  device_counts_top = {}
+  top_count = 0
   device_counts_original = {}
   original_count = 0
   device_counts_retweets = {}
   retweet_count = 0
   for month in _WINDOW_MONTHS:
     log('Finding device counts for month %s and delta %s.' % (month, max_delta))
-    if top_news:
-      log('Limiting device counts to tweets with urls in top %s percent of '
-          'ground truths' % int(_SIZE_TOP_NEWS * 100))
     dir_name = Util.get_data_dir_name_for(month) 
     for filename in os.listdir(dir_name):
       if '.tweet' in filename and 'http_nyti_ms' in filename:
@@ -138,6 +141,21 @@ def find_device_counts(max_delta, deltas, top_news=None, cache=None):
                                         _DATETIME_FORMAT)
             if Util.is_in_window(created):
               tweet_id = tokens[_TWEETFILE_TWEET_ID_INDEX]
+              source_device = tokens[_TWEETFILE_SOURCE_INDEX]
+              retweet = bool(int(tokens[_TWEETFILE_RETWEET_COUNT_INDEX]))
+
+              # If the url is in the top news, increment the count. Note
+              # we do not limit this by delta.
+              tweet_text = tokens[_TWEETFILE_TWEET_TEXT_INDEX]
+              urls = URLUtil.parse_urls(tweet_text, cache)
+              for url in urls:
+                if url in top_news:
+                  top_count += 1
+                  if source_device in device_counts_top:
+                    device_counts_top[source_device] += 1
+                  else:
+                    device_counts_top[source_device] = 1
+
               # If we don't see the tweet_id in the timedeltas file, we weren't
               # able to parse a url from the tweet text, so lets ignore it by
               # setting default delta to sys.maxint
@@ -145,37 +163,23 @@ def find_device_counts(max_delta, deltas, top_news=None, cache=None):
               if tweet_id in deltas:
                 delta = deltas[tweet_id]
               if delta < max_delta: 
-                # Check if url is in top news set. If no top news is given,
-                # then it defaults to yes.
-                in_top_news = True
-                if top_news:
-                  in_top_news = False
-                  tweet_text = tokens[_TWEETFILE_TWEET_TEXT_INDEX]
-                  urls = URLUtil.parse_urls(tweet_text, cache)
-                  for url in urls:
-                    if url in top_news:
-                      in_top_news = True
-
-                if in_top_news:
-                  source_device = tokens[_TWEETFILE_SOURCE_INDEX]
-                  retweet = bool(int(tokens[_TWEETFILE_RETWEET_COUNT_INDEX]))
-                  all_count += 1
-                  if source_device in device_counts:
-                    device_counts[source_device] += 1
+                all_count += 1
+                if source_device in device_counts:
+                  device_counts[source_device] += 1
+                else:
+                  device_counts[source_device] = 1
+                if retweet:
+                  retweet_count += 1
+                  if source_device in device_counts_retweets:
+                    device_counts_retweets[source_device] += 1
                   else:
-                    device_counts[source_device] = 1
-                  if retweet:
-                    retweet_count += 1
-                    if source_device in device_counts_retweets:
-                      device_counts_retweets[source_device] += 1
-                    else:
-                      device_counts_retweets[source_device] = 1
+                    device_counts_retweets[source_device] = 1
+                else:
+                  original_count += 1
+                  if source_device in device_counts_original:
+                    device_counts_original[source_device] += 1
                   else:
-                    original_count += 1
-                    if source_device in device_counts_original:
-                      device_counts_original[source_device] += 1
-                    else:
-                      device_counts_original[source_device] = 1
+                    device_counts_original[source_device] = 1
 
   for device, count in device_counts_original.items():
     device_total = device_counts[device]
@@ -189,8 +193,11 @@ def find_device_counts(max_delta, deltas, top_news=None, cache=None):
                                       (float(count) / device_total) * 100)
   for device, count in device_counts.items():
     device_counts[device] = (count, (float(count) / all_count) * 100)
+  for device, count in device_counts_top.items():
+    device_counts_top[device] = (count, (float(count) / top_count) * 100)
 
-  return device_counts, device_counts_original, device_counts_retweets
+  return (device_counts, device_counts_original, device_counts_retweets,
+          device_counts_top)
 
 
 def find_deltas():
@@ -207,46 +214,47 @@ def find_deltas():
   return tweet_id_to_delta
     
 
-def load_data(grouping):
+def load_data(param_str):
   """Loads the data from disk.
 
   Keyword Arguments:
-  grouping -- (String) Valid values are 'all', 'original', 'retweets'.
+  param_str -- (String) the parameters, e.g. _top_4
 
   Returns:
-  nf_all -- (List) (device, percent) tuples in sorted order.
-  top_dict -- (Dict) Maps device to percent, filtered by top news.
-  delta_dict -- (Dict) Maps device to percent, filtered by delta.
+  top -- (List) (device, percent) tuples in sorted order, top tweets.
+  original_dict -- (Dict) Maps device to percent, filtered by origin tweets.
+  retweet_dict -- (Dict) Maps device to percent, filtered by retweets.
   """
-  log('Loading data for %s...' % grouping)
-  nf_all = []
-  top_dict = {}
-  delta_dict = {}
-  with open('../data/SourceDevice/source_device_%s.tsv' % grouping) as in_file:
+  log('Loading data for %s...' % param_str)
+  top = []
+  original_dict = {}
+  retweet_dict = {}
+  with open('../data/SourceDevice/source_device_top%s.tsv'
+            % param_str) as in_file:
     for line in in_file:
       tokens = line.split('\t')
       device = tokens[_DEVICE_FILE_DEVICE_INDEX].strip()
       percent = float(tokens[_DEVICE_FILE_PERCENT1_INDEX].strip())
-      nf_all.append((device, percent))
-  with open('../data/SourceDevice/source_device_%s_t%s.tsv'
-            % (grouping, int(_SIZE_TOP_NEWS * 100))) as in_file:
+      top.append((device, percent))
+  with open('../data/SourceDevice/source_device_original%s.tsv'
+            % param_str) as in_file:
     for line in in_file:
       tokens = line.split('\t')
       device = tokens[_DEVICE_FILE_DEVICE_INDEX].strip()
       percent = float(tokens[_DEVICE_FILE_PERCENT1_INDEX].strip())
-      top_dict[device] = percent
-  with open('../data/SourceDevice/source_device_%s_%s.tsv'
-            % (grouping, _DELTA_FOR_GRAPH)) as in_file:
+      original_dict[device] = percent
+  with open('../data/SourceDevice/source_device_retweet%s.tsv'
+            % param_str) as in_file:
     for line in in_file:
       tokens = line.split('\t')
       device = tokens[_DEVICE_FILE_DEVICE_INDEX].strip()
       percent = float(tokens[_DEVICE_FILE_PERCENT1_INDEX].strip())
-      delta_dict[device] = percent
-  return nf_all, top_dict, delta_dict
+      retweet_dict[device] = percent
+  return top, original_dict, retweet_dict 
 
 
 def output_data(sorted_all_counts, sorted_original_counts,
-                sorted_retweet_counts, param_str):
+                sorted_retweet_counts, sorted_top_counts, param_str):
   """Outputs the data to disk.
 
   Keyword Arguments:
@@ -256,6 +264,8 @@ def output_data(sorted_all_counts, sorted_original_counts,
                             sorted, original tweets only
   sorted_retweet_counts -- (List) (device, (count, percent1, percent2)) tuples,
                            sorted, retweets only
+  sorted_top_counts -- (List, (device, (count, percent)) tuples sorted,
+                       top tweets only.
   """
   with open(_OUTPUT_DIR + 'source_device_all%s.tsv' % param_str,
             'w') as out_file:
@@ -274,22 +284,29 @@ def output_data(sorted_all_counts, sorted_original_counts,
                  percent_tweets_retweets) in sorted_retweet_counts:
       out_file.write('%s\t%s\t%s\t%s\n' % (device, count, percent_of_retweets,
                                              percent_tweets_retweets))
+  with open(_OUTPUT_DIR + 'source_device_top%s.tsv' % param_str,
+            'w') as out_file:
+    for device, (count, percentage) in sorted_top_counts:
+      out_file.write('%s\t%s\t%s\n' % (device, count, percentage))
 
 
-def sort_data(all_counts, original_counts, retweet_counts):
+def sort_data(all_counts, original_counts, retweet_counts, top_counts):
   """Sorts the data.
 
   Keyword Arguments:
   all_counts -- (Dict<String, Int>) device -> count, all tweets.
   original_counts -- (Dict<String, Int>) device -> count, original tweets only.
   retweet_counts -- (Dict<String, Int>) device -> count, retweet tweets only.
+  top_counts -- (Dict<String, Int>) device -> count, top tweets only.
 
   Returns:
   sorted_all_counts -- (List) (device, (count, percent)) tuples, all tweets.
   sorted_original_counts -- (List) (device, (count, percet1, percent2)) tuples,
                             original tweets only
   sorted_retweet_counts -- (List) (device, (count, percet1, percent2)) tuples,
-                            retweet tweets only
+                           retweet tweets only
+  sorted_top_counts -- (List) (device, (count, percent)) tuples,
+                       top tweets only.
   """
   sorted_all_counts = sorted(all_counts.items(), key=lambda x: x[1][0],
                              reverse=True)
@@ -298,7 +315,10 @@ def sort_data(all_counts, original_counts, retweet_counts):
   sorted_retweet_counts = sorted(retweet_counts.items(),
                                  key=lambda x: x[1][0],
                                  reverse=True)
-  return sorted_all_counts, sorted_original_counts, sorted_retweet_counts
+  sorted_top_counts = sorted(top_counts.items(), key=lambda x: x[1][0],
+                             reverse=True)
+  return (sorted_all_counts, sorted_original_counts, sorted_retweet_counts,
+          sorted_top_counts)
 
 
 def log(message):
@@ -310,6 +330,13 @@ def log(message):
   FileLog.log(_LOG_FILE, message)
 
 
+def _get_param_str(delta):
+  """Returns the correct param string."""
+  if delta == sys.maxint:
+    return ''
+  return '_%s' % delta
+
+
 def run():
   """Main logic for this analysis."""
   FileLog.set_log_dir()
@@ -319,51 +346,35 @@ def run():
     cache = Util.load_cache()
     seeds = Util.load_seeds()
 
-    # Do analysis only for stories in top news.
+    # Find top news
     param_str = '_t%s' % (int(_SIZE_TOP_NEWS * 100))
     gts = ground_truths.get_gt_rankings(seeds, DataSet.ALL)
     top_news = ground_truths.find_target_news(gts, _SIZE_TOP_NEWS)
 
-    (all_counts, original_counts,
-     retweet_counts) = find_device_counts(sys.maxint, deltas, top_news, cache)
-
-    (sorted_all_counts, sorted_original_counts,
-     sorted_retweet_counts) = sort_data(all_counts, original_counts,
-                                        retweet_counts)
-
-    output_data(sorted_all_counts, sorted_original_counts,
-                sorted_retweet_counts, param_str)
-
-    # Do analysis w/ delta, including sys.max to do analysis with no delta.
+    # Do analysis for all delta, including sys.max to do analysis with no delta.
     for delta in [sys.maxint] + _DELTAS:
-      param_str = '_%s' % delta
-      if delta == sys.maxint:
-        param_str = ''
+      param_str = _get_param_str(delta) 
 
       (all_counts, original_counts,
-       retweet_counts) = find_device_counts(delta, deltas)
+       retweet_counts, top_counts) = find_device_counts(delta, deltas, top_news,
+                                                        cache)
 
       (sorted_all_counts, sorted_original_counts,
-       sorted_retweet_counts) = sort_data(all_counts, original_counts,
-                                          retweet_counts)
+       sorted_retweet_counts, sorted_top_counts) = sort_data(all_counts,
+                                                             original_counts,
+                                                             retweet_counts,
+                                                             top_counts)
 
       output_data(sorted_all_counts, sorted_original_counts,
-                  sorted_retweet_counts, param_str)
+                  sorted_retweet_counts, sorted_top_counts, param_str)
 
   if _REDRAW_GRAPH:
-    (nf_all, top_dict_all, delta_dict_all) = load_data('all')
-    (nf_original, top_dict_original,
-     delta_dict_original) = load_data('original')
-    (nf_retweet, top_dict_retweet, delta_dict_retweet) = load_data('retweets')
-    log('Drawing all graph...')
-    draw_graph(nf_all, top_dict_all, delta_dict_all,
-               'all_%s' % _DELTA_FOR_GRAPH)
-    log('Drawing original graph...')
-    draw_graph(nf_original, top_dict_original, delta_dict_original,
-               'original_%s' % _DELTA_FOR_GRAPH)
-    log('Drawing retweets graph...')
-    draw_graph(nf_retweet, top_dict_retweet, delta_dict_retweet,
-               'retweets_%s' %_DELTA_FOR_GRAPH)
+    for delta in [sys.maxint] + _DELTAS:
+      param_str = _get_param_str(delta) 
+
+      (top, original_dict, retweet_dict) = load_data(param_str)
+      log('Drawing graph for delta %s...' % delta)
+      draw_graph(top, original_dict, retweet_dict, param_str)
 
   log('Analysis complete.')
   
