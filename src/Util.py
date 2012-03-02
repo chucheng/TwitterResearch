@@ -7,6 +7,7 @@ import smtplib
 import datetime
 from email.mime.text import MIMEText
 from datetime import datetime
+from ground_truths import DataSet
 
 import FileLog
 
@@ -94,6 +95,15 @@ def is_in_training_set(date_time):
       and date_time < datetime(year=2011, month=11, day=1)):
     return True
   return False
+
+
+def is_in_dataset(date_time, dataset):
+  if dataset == DataSet.TRAINING:
+    return is_in_training_set(date_time)
+  elif dataset == DataSet.TESTING:
+    return is_in_testing_set(date_time)
+  else:
+    return is_in_window(date_time)
 
 
 def is_in_window(date_time):
