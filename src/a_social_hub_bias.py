@@ -1,0 +1,186 @@
+"""This analysis attempts to determine the impact of social hub bias.
+
+__author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)
+"""
+import FileLog
+import Util
+import URLUtil
+from ground_truths import DataSet
+
+import os
+from datetime import datetime
+from datetime import timedelta
+
+from constants import _TWEETFILE_TWEET_TEXT_INDEX
+from constants import _TWEETFILE_USER_ID_INDEX
+from constants import _TWEETFILE_CREATED_AT_INDEX
+
+from constants import _WINDOW_MONTHS 
+from constants import _DATETIME_FORMAT
+
+_DELTA = 4
+
+_LOG_FILE = 'a_soure_device.log'
+_OUTPUT_DIR = '../data/SocialHubBias/'
+
+
+class Participant:
+  """Contains information regarding a participant in a news story."""
+
+  def __init__(self, user_id, delta):
+    """Initialize a Participant instance.
+
+    Keyword Arguments:
+    user_id -- (str) The users twitter id.
+    delta -- (int) The number of hours after this user becomes a participant
+             we should keep counting tweets.
+    """
+    self.user_id = user_id
+    self.deltatime = timedelta(hours=delta)
+    self.time_tweeted = None
+    self.count = 0
+
+  def notify_tweet_found(self, time):
+    """Notifies this user that the news story was tweeted.
+
+    Keyword Arguments:
+    time -- (datetime) The time the tweet was tweeted.
+    """
+    if self.count == 0:
+      self.time_tweeted = time
+    if time - self.time_tweeted < self.deltatime:
+      self.count += 1
+
+
+class NewsParticipants:
+  """Keeps a list of participants, or listeners. Broadcasts
+     new tweet information to all participants."""
+
+  def __init__(self, delta):
+    """Initialize a NewsParticipants instance.
+    
+    Keyword Arguments:
+    delta -- (int) Window time, in hours.
+    """
+    self.delta = delta
+    self.participants = []
+
+  def broadcast(self, user_id, time):
+    """Broadcasts new tweet information to all participants.
+    
+    Keyword Arguments:
+    user_id -- (str) The twitter id of the tweet's author.
+    time -- (datetime) The time at which the tweet was tweeted.
+    """
+    new_participant = True
+    for participant in self.participants:
+      if participant.user_id == user_id:
+        new_participant = False
+      else:
+        participant.notify_tweet_found(time)
+    if new_participant:
+      self.participants.append(Participant(user_id, self.delta))
+
+
+def gather_rates(seeds, cache, months, delta):
+  """Aggregates information accross every tweet.
+
+  For every url found, the authors twitter id, the url, and the time at
+  which it was tweeted is broadcast to a set of listeners for that url.
+  Each listener, or participant, can than decide if that tweet fits
+  within their window.
+
+  Keyword Arguments:
+  seeds -- Dict<str, (_, _, datetime) url -> _, _, seed_time
+  cache -- Dict<str, str> short_url -> long_url
+  months -- (List<str>) months, as 2-digit number strings
+  delta -- (int) in hours
+
+  Returns:
+  participants -- (Dict<str, NewsParticipants>) url -> NewsParticipants
+  """
+  participants = {}
+  for month in months:
+    log('Parsing tweets from month %s with delta %s...' % (month, delta))
+    dir_name = Util.get_data_dir_name_for(month) 
+    for filename in os.listdir(dir_name):
+      if '.tweet' in filename and 'http_nyti_ms' in filename:
+        data_file = '%s/%s' % (dir_name, filename)
+        with open(data_file) as input_file:
+          for line in input_file:
+            tokens = line.split('\t')
+            tweet_text = tokens[_TWEETFILE_TWEET_TEXT_INDEX]
+            urls = URLUtil.parse_urls(tweet_text, cache)
+            for url in urls:
+              _, _, seed_time = seeds[url]
+              if Util.is_in_dataset(seed_time, DataSet.ALL):
+                user_id = tokens[_TWEETFILE_USER_ID_INDEX]
+                created = datetime.strptime(tokens[_TWEETFILE_CREATED_AT_INDEX],
+                                            _DATETIME_FORMAT)
+                if not url in participants:
+                  participants[url] = NewsParticipants(delta)
+                participants[url].broadcast(user_id, created)
+  return participants
+
+
+def calc_rates(news_to_participants):
+  """Calculates the rates for each user.
+
+  Iterates over all news stories, then all participants for that story.
+
+  Keyword Arguments:
+  news_to_participants -- (Dict<str, NewsParticipants>) url -> NewsParticipants
+
+  Returns:
+  Dict<str, (int, int)> user_id -> (count, total news)
+  """
+  log('Calculating rates...')
+  user_to_rate = {}
+  for news_participants in news_to_participants.values():
+    for participant in news_participants.participants:
+      user_id = participant.user_id
+      if user_id in user_to_rate:
+        sum_counts, total_num_stories = user_to_rate[user_id]
+        user_to_rate[user_id] = (sum_counts + participant.count,
+                                 total_num_stories + 1.)
+      else:
+        user_to_rate[user_id] = (participant.count, 1.)
+  return user_to_rate
+
+
+def output_data(user_to_rate):
+  """Outputs intermediary rate data to disk.
+
+  Keyword Arguments:
+  user_to_rate -- (Dict<str, (int, int)) user_id -> (count, num_stories)
+                  Contains the info to calculate the rate for each user.
+  """
+  log('Outputting rate data to disk...')
+  Util.ensure_dir_exist(_OUTPUT_DIR)
+  with open(_OUTPUT_DIR + 'user_rates.tsv', 'w') as out_file:
+    for user_id, (count, num_stories) in user_to_rate.items():
+      out_file.write('%s\t%s\n' % (user_id, count / num_stories))
+            
+
+def run():
+  """The main logic of this analysis."""
+  cache = Util.load_cache()
+  seeds = Util.load_seeds()
+
+  news_to_participants = gather_rates(seeds, cache, _WINDOW_MONTHS, _DELTA)
+  user_to_rate = calc_rates(news_to_participants)
+  output_data(user_to_rate)
+  log('Analysis done!')
+  
+
+def log(message):
+  """Helper method to modularize the format of log messages.
+    
+    Keyword Arguments:
+    message -- A string to print.
+  """  
+  FileLog.log(_LOG_FILE, message)
+
+
+if __name__ == "__main__":
+  run()
