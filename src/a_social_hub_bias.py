@@ -5,22 +5,32 @@ __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)
 import FileLog
 import Util
 import URLUtil
+import crawl_users
 from ground_truths import DataSet
 
 import os
 from datetime import datetime
 from datetime import timedelta
 
+import tweepy
+
 from constants import _TWEETFILE_TWEET_TEXT_INDEX
 from constants import _TWEETFILE_USER_ID_INDEX
 from constants import _TWEETFILE_CREATED_AT_INDEX
 
+from constants import _RATES_FILE_USER_ID_INDEX
+from constants import _RATES_FILE_RATE_INDEX
+
 from constants import _WINDOW_MONTHS 
 from constants import _DATETIME_FORMAT
 
+_DRAW_GRAPH = False
+_REGENERATE_DATA = True
+_DEBUG = True
+
 _DELTA = 4
 
-_LOG_FILE = 'a_soure_device.log'
+_LOG_FILE = 'a_social_hub_bias.log'
 _OUTPUT_DIR = '../data/SocialHubBias/'
 
 
@@ -148,6 +158,19 @@ def calc_rates(news_to_participants):
   return user_to_rate
 
 
+def load_rates():
+  """Loads rates from disk."""
+  log('Loading rates...')
+  user_to_rate = {}
+  with open(_OUTPUT_DIR + 'user_rates.tsv') as in_file:
+    for line in in_file:
+      tokens = line.split('\t')
+      user_id = tokens[_RATES_FILE_USER_ID_INDEX]
+      rate = float(tokens[_RATES_FILE_RATE_INDEX])
+      user_to_rate[user_id] = rate
+  return user_to_rate
+
+
 def output_data(user_to_rate):
   """Outputs intermediary rate data to disk.
 
@@ -160,16 +183,67 @@ def output_data(user_to_rate):
   with open(_OUTPUT_DIR + 'user_rates.tsv', 'w') as out_file:
     for user_id, (count, num_stories) in user_to_rate.items():
       out_file.write('%s\t%s\n' % (user_id, count / num_stories))
+
+
+def get_updated_user_info(user_to_rate):
+  """Get user info for any users not already crawled.
+
+  Keyword Arguments:
+  user_to_rate -- (Dict<str, float>) user_id -> rate
+
+  Returns:
+  user_info -- (Set<crawl_users.User>) new users
+  """
+  log('Updating user info...')
+  user_info = crawl_users.load_user_info()
+  users_without_info = set()
+  for user_id in user_to_rate:
+    if not user_id in user_info:
+      users_without_info.add(user_id)
+  (new_user_info,
+   user_ids_not_found) = crawl_users.get_user_info(tweepy.API(),
+                                                   users_without_info) 
+  user_info.update([(str(user.id), user) for user in new_user_info])
+  for user_id in user_ids_not_found:
+    if user_id in user_to_rate:
+      del user_to_rate[user_id]
+  return user_info
             
 
 def run():
   """The main logic of this analysis."""
-  cache = Util.load_cache()
-  seeds = Util.load_seeds()
+  if _REGENERATE_DATA:
+    user_to_rate = {} 
+    if _DEBUG:
+      user_to_rate = load_rates()
+      user_to_rate = dict(user_to_rate.items()[:10])
+    else:
+      cache = Util.load_cache()
+      seeds = Util.load_seeds()
 
-  news_to_participants = gather_rates(seeds, cache, _WINDOW_MONTHS, _DELTA)
-  user_to_rate = calc_rates(news_to_participants)
-  output_data(user_to_rate)
+      news_to_participants = gather_rates(seeds, cache, _WINDOW_MONTHS, _DELTA)
+      user_to_rate = calc_rates(news_to_participants)
+
+    user_info = get_updated_user_info(user_to_rate)
+    if _DEBUG:
+      for user_id, rate in user_to_rate.items():
+        user = user_info[user_id]
+        log('%s: %s\t%s\t%s' % (user_id, user.screen_name, rate,
+                                user.followers_count)) 
+    else:
+      crawl_users.output_users(user_info)
+      output_data(user_to_rate)
+
+
+  if _DRAW_GRAPH:
+    user_to_rate = load_rates()
+    user_info = crawl_users.load_user_info()
+    rates = []
+    num_followers = []
+    for user_id in user_to_rate:
+      rates.append(user_to_rate[user_id])
+      num_followers.append(user_info[user_id].followers_count)
+    # draw_graph(rates, num_followers)
   log('Analysis done!')
   
 

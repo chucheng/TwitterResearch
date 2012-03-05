@@ -9,8 +9,23 @@ __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 import FileLog
 import Util
 
+import os
+import time
+import pprint
 from datetime import datetime
+
 import tweepy
+
+from constants import _USER_INFO_FILE_ID_INDEX
+from constants import _USER_INFO_FILE_SCREEN_NAME_INDEX
+from constants import _USER_INFO_FILE_NAME_INDEX
+from constants import _USER_INFO_FILE_FOLLOWERS_COUNT_INDEX
+from constants import _USER_INFO_FILE_STATUSES_COUNT_INDEX
+from constants import _USER_INFO_FILE_DESCRIPTION_INDEX
+from constants import _USER_INFO_FILE_FRIENDS_COUNT_INDEX
+from constants import _USER_INFO_FILE_CREATED_AT_INDEX
+from constants import _USER_INFO_FILE_LISTED_COUNT_INDEX
+from constants import _USER_INFO_FILE_VERIFIED_INDEX
 
 _NYTIMES_USER_ID = 807095
 _NYTIMES_HANDLE = u'@nytimes'
@@ -44,6 +59,26 @@ _LOG_FILE = 'crawl_users.log'
 _OUTPUT_DIR = '../data/SocialHubBias/'
 
 
+def check_rate_limit_and_wait_if_needed(api): # pylint: disable-msg=C0103
+  """Waits if twitter rate limit is about to be exceeded.
+  
+  Keyword Argument:
+  api -- (tweepy.API) api instance being used to make calls.
+  """
+  while True:
+    try:
+      hits_remaining = api.rate_limit_status()['remaining_hits']
+      if hits_remaining < 10:
+        log('Rate limit status low, waiting for 15 min...')
+        time.sleep(15 * 60)
+      else:
+        return
+    except tweepy.error.TweepError, err: # pylint: disable-msg=E1101
+      log('%s' % err)
+      log('Error checking wait limit status, waiting for 15 min...')
+      time.sleep(15 * 60)
+
+
 def get_user_info(api, user_ids):
   """Queries twitter for user information.
 
@@ -52,13 +87,52 @@ def get_user_info(api, user_ids):
   user_ids -- (Set<int>) twitter ids to get info for.
 
   Returns:
-  users -- (Set<tweepy.model.User>)
+  users -- (Set<User>)
+  users_ids_not_found -- (Set<str>) user ids that were not found.
   """
   log('Querying twitter for user info...')
   users = set()
+  user_ids_not_found = set()
   for user_id in user_ids:
-    user = api.get_user(user_id)
-    users.add(user)
+    check_rate_limit_and_wait_if_needed(api)
+    try:
+      tweepy_user = api.get_user(int(user_id))
+      users.add(User.from_tweepy_user(tweepy_user))
+    except tweepy.error.TweepError, err: # pylint: disable-msg=E1101
+      log('%s (user_id: %s)' % (err, user_id))
+      user_ids_not_found.add(user_id)
+  return users, user_ids_not_found
+
+
+def load_user_info():
+  """Loads previously crawled user infomation from disk.
+
+  Returns:
+  users -- (Dict<str, crawl_users.User>) user_id => user
+  """
+  log('Loading user_info...')
+  users = {}
+  user_info_file = _OUTPUT_DIR + 'user_info.tsv'
+  if not os.path.exists(user_info_file):
+    return users
+  with open(user_info_file) as in_file:
+    for line in in_file:
+      tokens = line.split('\t')
+      user_id = tokens[_USER_INFO_FILE_ID_INDEX]
+      screen_name = tokens[_USER_INFO_FILE_SCREEN_NAME_INDEX]
+      name = tokens[_USER_INFO_FILE_NAME_INDEX]
+      followers_count = tokens[_USER_INFO_FILE_FOLLOWERS_COUNT_INDEX]
+      statuses_count = tokens[_USER_INFO_FILE_STATUSES_COUNT_INDEX]
+      description = tokens[_USER_INFO_FILE_DESCRIPTION_INDEX]
+      friends_count = tokens[_USER_INFO_FILE_FRIENDS_COUNT_INDEX]
+      # TODO: Make this datetime.
+      created_at = tokens[_USER_INFO_FILE_CREATED_AT_INDEX]
+      listed_count = tokens[_USER_INFO_FILE_LISTED_COUNT_INDEX]
+      verified = tokens[_USER_INFO_FILE_VERIFIED_INDEX].strip() == True
+      user = User(user_id, screen_name, name, followers_count, statuses_count,
+                  description, friends_count, created_at, listed_count,
+                  verified)
+      users[user_id] = user
   return users
 
 
@@ -86,8 +160,9 @@ def run():
   api and using up rate limit."""
   api = tweepy.API()
   api.get_user = __mock_get_user
-  users = get_user_info(api, _DEBUG_USER_IDS)
-  output_users(users)
+  users, user_ids_not_found = get_user_info(api, _DEBUG_USER_IDS)
+  for user in users:
+    log('%s' % user)
   log('Analysis done!')
   
 
@@ -107,12 +182,54 @@ def __mock_get_user(user_id):
     return MockUser(user_id, '@fake', 'Fake')
 
 
+class User:
+  """Wrapper class for user infomation.
+
+  Handy for referencing user information by logical name. Also, we don't
+  want to be dependant on tweepy objects in other areas of our code.
+  """
+  def __init__(self, user_id, screen_name, name, followers_count,
+               statuses_count, description, friends_count, created_at,
+               listed_count, verified):
+    """Create a new instance of this class."""
+    self.id = user_id # pylint: disable-msg=C0103
+    self.screen_name = screen_name
+    self.name = name
+    self.followers_count = followers_count
+    self.statuses_count = statuses_count
+    self.description = description
+    self.friends_count = friends_count
+    self.created_at = created_at
+    self.listed_count = listed_count
+    self.verified = verified
+
+  @classmethod
+  def from_tweepy_user(cls, tweepy_user):
+    """Factory method for creating a new User instance.
+
+    Keyword Arguments:
+    tweepy_user -- (tweepy.model.User) tweepy user instance to copy data from.
+
+    Returns:
+    A new User instance.
+    """
+    return User(tweepy_user.id, tweepy_user.screen_name, tweepy_user.name,
+                tweepy_user.followers_count, tweepy_user.statuses_count,
+                tweepy_user.description, tweepy_user.friends_count,
+                tweepy_user.created_at, tweepy_user.listed_count,
+                tweepy_user.verified)
+
+  def __str__(self):
+    """Create a pretty str representation."""
+    return pprint.pformat(vars(self))
+
+  
 class MockUser:
   """Mock tweepy.api.User for debugging purposes."""
 
   def __init__(self, user_id, handle, name):
     """Initialize an instance of this class."""
-    self.id = user_id
+    self.id = user_id # pylint: disable-msg=C0103
     self.str_id = str(user_id)
     self.screen_name = handle
     self.name = name
@@ -123,6 +240,10 @@ class MockUser:
     self.created_at = datetime.now()
     self.listed_count = 10
     self.verified = True
+
+  def __str__(self):
+    """Create a pretty str representation."""
+    return pprint.pformat(vars(self))
 
 
 def log(message):
