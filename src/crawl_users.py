@@ -10,6 +10,7 @@ import FileLog
 import Util
 
 import os
+import codecs
 import time
 import pprint
 from datetime import datetime
@@ -21,11 +22,12 @@ from constants import _USER_INFO_FILE_SCREEN_NAME_INDEX
 from constants import _USER_INFO_FILE_NAME_INDEX
 from constants import _USER_INFO_FILE_FOLLOWERS_COUNT_INDEX
 from constants import _USER_INFO_FILE_STATUSES_COUNT_INDEX
-from constants import _USER_INFO_FILE_DESCRIPTION_INDEX
 from constants import _USER_INFO_FILE_FRIENDS_COUNT_INDEX
 from constants import _USER_INFO_FILE_CREATED_AT_INDEX
 from constants import _USER_INFO_FILE_LISTED_COUNT_INDEX
 from constants import _USER_INFO_FILE_VERIFIED_INDEX
+
+from constants import _DATETIME_FORMAT
 
 _NYTIMES_USER_ID = 807095
 _NYTIMES_HANDLE = u'@nytimes'
@@ -115,23 +117,20 @@ def load_user_info():
   user_info_file = _OUTPUT_DIR + 'user_info.tsv'
   if not os.path.exists(user_info_file):
     return users
-  with open(user_info_file) as in_file:
+  with codecs.open(user_info_file, encoding='utf-8') as in_file:
     for line in in_file:
       tokens = line.split('\t')
       user_id = tokens[_USER_INFO_FILE_ID_INDEX]
       screen_name = tokens[_USER_INFO_FILE_SCREEN_NAME_INDEX]
       name = tokens[_USER_INFO_FILE_NAME_INDEX]
-      followers_count = tokens[_USER_INFO_FILE_FOLLOWERS_COUNT_INDEX]
-      statuses_count = tokens[_USER_INFO_FILE_STATUSES_COUNT_INDEX]
-      description = tokens[_USER_INFO_FILE_DESCRIPTION_INDEX]
-      friends_count = tokens[_USER_INFO_FILE_FRIENDS_COUNT_INDEX]
-      # TODO: Make this datetime.
+      followers_count = int(tokens[_USER_INFO_FILE_FOLLOWERS_COUNT_INDEX])
+      statuses_count = int(tokens[_USER_INFO_FILE_STATUSES_COUNT_INDEX])
+      friends_count = int(tokens[_USER_INFO_FILE_FRIENDS_COUNT_INDEX])
       created_at = tokens[_USER_INFO_FILE_CREATED_AT_INDEX]
-      listed_count = tokens[_USER_INFO_FILE_LISTED_COUNT_INDEX]
+      listed_count = int(tokens[_USER_INFO_FILE_LISTED_COUNT_INDEX])
       verified = tokens[_USER_INFO_FILE_VERIFIED_INDEX].strip() == True
       user = User(user_id, screen_name, name, followers_count, statuses_count,
-                  description, friends_count, created_at, listed_count,
-                  verified)
+                  friends_count, created_at, listed_count, verified)
       users[user_id] = user
   return users
 
@@ -144,13 +143,13 @@ def output_users(users):
   """
   log('Outputting user info to disk...')
   Util.ensure_dir_exist(_OUTPUT_DIR)
-  with open(_OUTPUT_DIR + 'user_info.tsv', 'w') as out_file:
+  with codecs.open(_OUTPUT_DIR + 'user_info.tsv', 'w',
+                   encoding='utf-8') as out_file:
     for user in users:
-      out_file.write('%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n'
+      out_file.write(u'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n'
                      % (user.id, user.screen_name, user.name,
                         user.followers_count, user.statuses_count,
-                        user.description, user.friends_count,
-                        user.created_at, user.listed_count,
+                        user.friends_count, user.created_at, user.listed_count,
                         user.verified))
 
 
@@ -160,7 +159,8 @@ def run():
   api and using up rate limit."""
   api = tweepy.API()
   api.get_user = __mock_get_user
-  users, user_ids_not_found = get_user_info(api, _DEBUG_USER_IDS)
+  users, user_ids_not_found = get_user_info(api, # pylint: disable-msg=W0612
+                                            _DEBUG_USER_IDS)
   for user in users:
     log('%s' % user)
   log('Analysis done!')
@@ -189,7 +189,7 @@ class User:
   want to be dependant on tweepy objects in other areas of our code.
   """
   def __init__(self, user_id, screen_name, name, followers_count,
-               statuses_count, description, friends_count, created_at,
+               statuses_count, friends_count, created_at,
                listed_count, verified):
     """Create a new instance of this class."""
     self.id = user_id # pylint: disable-msg=C0103
@@ -197,9 +197,11 @@ class User:
     self.name = name
     self.followers_count = followers_count
     self.statuses_count = statuses_count
-    self.description = description
     self.friends_count = friends_count
-    self.created_at = created_at
+    if isinstance(created_at, str):
+      self.created_at = datetime.strptime(created_at, _DATETIME_FORMAT)
+    else:
+      self.created_at = created_at
     self.listed_count = listed_count
     self.verified = verified
 
@@ -215,9 +217,8 @@ class User:
     """
     return User(tweepy_user.id, tweepy_user.screen_name, tweepy_user.name,
                 tweepy_user.followers_count, tweepy_user.statuses_count,
-                tweepy_user.description, tweepy_user.friends_count,
-                tweepy_user.created_at, tweepy_user.listed_count,
-                tweepy_user.verified)
+                tweepy_user.friends_count, tweepy_user.created_at,
+                tweepy_user.listed_count, tweepy_user.verified)
 
   def __str__(self):
     """Create a pretty str representation."""
@@ -235,7 +236,6 @@ class MockUser:
     self.name = name
     self.followers_count = 10
     self.statuses_count = 10
-    self.description = 'Mock account description!'
     self.friends_count = 10
     self.created_at = datetime.now()
     self.listed_count = 10

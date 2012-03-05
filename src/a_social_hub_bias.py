@@ -12,6 +12,11 @@ import os
 from datetime import datetime
 from datetime import timedelta
 
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+
 import tweepy
 
 from constants import _TWEETFILE_TWEET_TEXT_INDEX
@@ -24,14 +29,15 @@ from constants import _RATES_FILE_RATE_INDEX
 from constants import _WINDOW_MONTHS 
 from constants import _DATETIME_FORMAT
 
-_DRAW_GRAPH = False
-_REGENERATE_DATA = True
+_DRAW_GRAPH = True
+_REGENERATE_DATA = False
 _DEBUG = True
 
 _DELTA = 4
 
 _LOG_FILE = 'a_social_hub_bias.log'
 _OUTPUT_DIR = '../data/SocialHubBias/'
+_GRAPH_DIR = Util.get_graph_output_dir('SocialHubBias/')
 
 
 class Participant:
@@ -92,6 +98,32 @@ class NewsParticipants:
       self.participants.append(Participant(user_id, self.delta))
 
 
+def draw_graph(rates, num_followers):
+  """Draws a scatter plot.
+
+  Keyword Arugments:
+  rates -- (List<float>) the rates
+  num_followers -- (List<int>) the matching num followers
+  """
+  figure = plt.figure()
+  axs = figure.add_subplot(111)
+
+  axs.scatter(num_followers, rates)
+
+  plt.xlabel('Num Followers')
+  plt.ylabel('Rate')
+
+  plt.axis([0, max(num_followers), 0, max(rates)])
+
+  with open(_GRAPH_DIR + 'social_hub_bias.png', 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + 'social_hub_bias.eps', 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  plt.close()
+
+
+
 def gather_rates(seeds, cache, months, delta):
   """Aggregates information accross every tweet.
 
@@ -142,7 +174,7 @@ def calc_rates(news_to_participants):
   news_to_participants -- (Dict<str, NewsParticipants>) url -> NewsParticipants
 
   Returns:
-  Dict<str, (int, int)> user_id -> (count, total news)
+  Dict<str, (int, int)> user_id -> rate
   """
   log('Calculating rates...')
   user_to_rate = {}
@@ -155,6 +187,10 @@ def calc_rates(news_to_participants):
                                  total_num_stories + 1.)
       else:
         user_to_rate[user_id] = (participant.count, 1.)
+
+  # Do division here so output method matches load method.
+  for user_id, (count, num_stories) in user_to_rate:
+    user_to_rate[user_id] = count / num_stories
   return user_to_rate
 
 
@@ -181,8 +217,8 @@ def output_data(user_to_rate):
   log('Outputting rate data to disk...')
   Util.ensure_dir_exist(_OUTPUT_DIR)
   with open(_OUTPUT_DIR + 'user_rates.tsv', 'w') as out_file:
-    for user_id, (count, num_stories) in user_to_rate.items():
-      out_file.write('%s\t%s\n' % (user_id, count / num_stories))
+    for user_id, rate in user_to_rate.items():
+      out_file.write('%s\t%s\n' % (user_id, rate))
 
 
 def get_updated_user_info(user_to_rate):
@@ -212,6 +248,11 @@ def get_updated_user_info(user_to_rate):
 
 def run():
   """The main logic of this analysis."""
+  global _OUTPUT_DIR # pylint: disable-msg=W0603
+  if _DEBUG:
+    _OUTPUT_DIR += 'debug/'
+    crawl_users._OUTPUT_DIR += 'debug/'
+
   if _REGENERATE_DATA:
     user_to_rate = {} 
     if _DEBUG:
@@ -225,14 +266,9 @@ def run():
       user_to_rate = calc_rates(news_to_participants)
 
     user_info = get_updated_user_info(user_to_rate)
-    if _DEBUG:
-      for user_id, rate in user_to_rate.items():
-        user = user_info[user_id]
-        log('%s: %s\t%s\t%s' % (user_id, user.screen_name, rate,
-                                user.followers_count)) 
-    else:
-      crawl_users.output_users(user_info)
-      output_data(user_to_rate)
+
+    crawl_users.output_users(user_info.values())
+    output_data(user_to_rate)
 
 
   if _DRAW_GRAPH:
@@ -243,7 +279,8 @@ def run():
     for user_id in user_to_rate:
       rates.append(user_to_rate[user_id])
       num_followers.append(user_info[user_id].followers_count)
-    # draw_graph(rates, num_followers)
+    log('Outputting Graph...')
+    draw_graph(rates, num_followers)
   log('Analysis done!')
   
 
