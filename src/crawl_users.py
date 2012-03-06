@@ -26,36 +26,11 @@ from constants import _USER_INFO_FILE_FRIENDS_COUNT_INDEX
 from constants import _USER_INFO_FILE_CREATED_AT_INDEX
 from constants import _USER_INFO_FILE_LISTED_COUNT_INDEX
 from constants import _USER_INFO_FILE_VERIFIED_INDEX
+from constants import _USER_INFO_FILE_UTC_INDEX
+from constants import _USER_INFO_FILE_TIME_ZONE_INDEX
+from constants import _USER_INFO_FILE_LANG_INDEX
 
 from constants import _DATETIME_FORMAT
-
-_NYTIMES_USER_ID = 807095
-_NYTIMES_HANDLE = u'@nytimes'
-_NYTIMES_NAME = u'The New York Times'
-
-_POGUE_USER_ID = 9534522
-_POGUE_HANDLE = u'@pogue'
-_POGUE_NAME = u'David Pogue'
-
-_FIVETHIRTYEIGHT_USER_ID = 16017475
-_FIVETHIRTYEIGHT_HANDLE = u'@fivethirtyeight'
-_FIVETHIRTYEIGHT_NAME = u'Nate Silver'
-
-_ANDYRNYT_USER_ID = 14434063
-_ANDYRNYT_HANDLE = u'@andyrNYT'
-_ANDYRNYT_NAME = u'Andrew Rosenthal' 
-
-_NYTPOLLS_USER_ID = 255719070
-_NYTPOLLS_HANDLE = u'@nytpolls'
-_NYTPOLLS_NAME = u'New York Times Polls' 
-
-_DEBUG_USER_IDS = set()
-_DEBUG_USER_IDS.add(_NYTIMES_USER_ID)
-_DEBUG_USER_IDS.add(_POGUE_USER_ID)
-_DEBUG_USER_IDS.add(_FIVETHIRTYEIGHT_USER_ID)
-_DEBUG_USER_IDS.add(_ANDYRNYT_USER_ID)
-_DEBUG_USER_IDS.add(_NYTPOLLS_USER_ID)
-
 
 _LOG_FILE = 'crawl_users.log'
 _OUTPUT_DIR = '../data/SocialHubBias/'
@@ -70,7 +45,7 @@ def check_rate_limit_and_wait_if_needed(api): # pylint: disable-msg=C0103
   while True:
     try:
       hits_remaining = api.rate_limit_status()['remaining_hits']
-      if hits_remaining < 10:
+      if hits_remaining < 100:
         log('Rate limit status low, waiting for 15 min...')
         time.sleep(15 * 60)
       else:
@@ -89,21 +64,22 @@ def get_user_info(api, user_ids):
   user_ids -- (Set<int>) twitter ids to get info for.
 
   Returns:
-  users -- (Set<User>)
-  users_ids_not_found -- (Set<str>) user ids that were not found.
   """
   log('Querying twitter for user info...')
-  users = set()
-  user_ids_not_found = set()
-  for user_id in user_ids:
-    check_rate_limit_and_wait_if_needed(api)
-    try:
-      tweepy_user = api.get_user(int(user_id))
-      users.add(User.from_tweepy_user(tweepy_user))
-    except tweepy.error.TweepError, err: # pylint: disable-msg=E1101
-      log('%s (user_id: %s)' % (err, user_id))
-      user_ids_not_found.add(user_id)
-  return users, user_ids_not_found
+  Util.ensure_dir_exist(_OUTPUT_DIR)
+  with codecs.open(_OUTPUT_DIR + 'user_info.tsv', 'a',
+                   encoding='utf-8') as out_file:
+    count = 1
+    for user_id in user_ids:
+      check_rate_limit_and_wait_if_needed(api)
+      log('%s: %s' % (count, user_id))
+      try:
+        tweepy_user = api.get_user(int(user_id))
+        user = User.from_tweepy_user(tweepy_user)
+        output_user(out_file, user)
+      except tweepy.error.TweepError, err: # pylint: disable-msg=E1101
+        log('%s (user_id: %s)' % (err, user_id))
+      count += 1
 
 
 def load_user_info():
@@ -129,57 +105,28 @@ def load_user_info():
       created_at = tokens[_USER_INFO_FILE_CREATED_AT_INDEX]
       listed_count = int(tokens[_USER_INFO_FILE_LISTED_COUNT_INDEX])
       verified = tokens[_USER_INFO_FILE_VERIFIED_INDEX].strip() == True
+      utc_offset = int(tokens[_USER_INFO_FILE_UTC_INDEX])
+      time_zone = tokens[_USER_INFO_FILE_TIME_ZONE_INDEX]
+      lang = tokens[_USER_INFO_FILE_LANG_INDEX]
       user = User(user_id, screen_name, name, followers_count, statuses_count,
-                  friends_count, created_at, listed_count, verified)
+                  friends_count, created_at, listed_count, verified, utc_offset,
+                  time_zone, lang)
       users[user_id] = user
   return users
 
 
-def output_users(users):
+def output_user(out_file, user):
   """Outputs user info to disk.
 
   Keyword Arguments:
   users -- (Set<tweepy.model.User>)
   """
-  log('Outputting user info to disk...')
-  Util.ensure_dir_exist(_OUTPUT_DIR)
-  with codecs.open(_OUTPUT_DIR + 'user_info.tsv', 'w',
-                   encoding='utf-8') as out_file:
-    for user in users:
-      out_file.write(u'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n'
-                     % (user.id, user.screen_name, user.name,
-                        user.followers_count, user.statuses_count,
-                        user.friends_count, user.created_at, user.listed_count,
-                        user.verified))
-
-
-def run():
-  """For debugging purposes. Uses mock data and mocks out
-  tweepy api object's methods to avoid actually calling the Twitter
-  api and using up rate limit."""
-  api = tweepy.API()
-  api.get_user = __mock_get_user
-  users, user_ids_not_found = get_user_info(api, # pylint: disable-msg=W0612
-                                            _DEBUG_USER_IDS)
-  for user in users:
-    log('%s' % user)
-  log('Analysis done!')
-  
-
-def __mock_get_user(user_id):
-  """Mock get_user for debugging purposes."""
-  if user_id == _NYTIMES_USER_ID:
-    return MockUser(user_id, _NYTIMES_HANDLE, _NYTIMES_NAME)
-  elif user_id == _POGUE_USER_ID:
-    return MockUser(user_id, _POGUE_HANDLE, _POGUE_NAME)
-  elif user_id == _FIVETHIRTYEIGHT_USER_ID:
-    return MockUser(user_id, _FIVETHIRTYEIGHT_HANDLE, _FIVETHIRTYEIGHT_NAME)
-  elif user_id == _ANDYRNYT_USER_ID:
-    return MockUser(user_id, _ANDYRNYT_HANDLE, _ANDYRNYT_NAME)
-  elif user_id == _NYTPOLLS_USER_ID:
-    return MockUser(user_id, _NYTPOLLS_HANDLE, _NYTPOLLS_NAME)
-  else:
-    return MockUser(user_id, '@fake', 'Fake')
+  out_file.write(u'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n'
+                 % (user.id, user.screen_name, user.name,
+                    user.followers_count, user.statuses_count,
+                    user.friends_count, user.created_at, user.listed_count,
+                    user.verified, user.utc_offset, user.time_zone,
+                    user.lang))
 
 
 class User:
@@ -190,7 +137,7 @@ class User:
   """
   def __init__(self, user_id, screen_name, name, followers_count,
                statuses_count, friends_count, created_at,
-               listed_count, verified):
+               listed_count, verified, utc_offset, time_zone, lang):
     """Create a new instance of this class."""
     self.id = user_id # pylint: disable-msg=C0103
     self.screen_name = screen_name
@@ -204,6 +151,12 @@ class User:
       self.created_at = created_at
     self.listed_count = listed_count
     self.verified = verified
+    if isinstance(utc_offset, str):
+      self.utc_offset = int(utc_offset)
+    else:
+      self.utc_offset = utc_offset
+    self.time_zone = time_zone
+    self.lang = lang
 
   @classmethod
   def from_tweepy_user(cls, tweepy_user):
@@ -218,33 +171,14 @@ class User:
     return User(tweepy_user.id, tweepy_user.screen_name, tweepy_user.name,
                 tweepy_user.followers_count, tweepy_user.statuses_count,
                 tweepy_user.friends_count, tweepy_user.created_at,
-                tweepy_user.listed_count, tweepy_user.verified)
+                tweepy_user.listed_count, tweepy_user.verified,
+                tweepy_user.utc_offset, tweepy_user.time_zone,
+                tweepy_user.lang)
 
   def __str__(self):
     """Create a pretty str representation."""
     return pprint.pformat(vars(self))
-
   
-class MockUser:
-  """Mock tweepy.api.User for debugging purposes."""
-
-  def __init__(self, user_id, handle, name):
-    """Initialize an instance of this class."""
-    self.id = user_id # pylint: disable-msg=C0103
-    self.str_id = str(user_id)
-    self.screen_name = handle
-    self.name = name
-    self.followers_count = 10
-    self.statuses_count = 10
-    self.friends_count = 10
-    self.created_at = datetime.now()
-    self.listed_count = 10
-    self.verified = True
-
-  def __str__(self):
-    """Create a pretty str representation."""
-    return pprint.pformat(vars(self))
-
 
 def log(message):
   """Helper method to modularize the format of log messages.
@@ -253,7 +187,3 @@ def log(message):
     message -- A string to print.
   """  
   FileLog.log(_LOG_FILE, message)
-
-
-if __name__ == "__main__":
-  run()

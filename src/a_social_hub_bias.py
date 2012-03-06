@@ -31,8 +31,8 @@ from constants import _WINDOW_MONTHS
 from constants import _DATETIME_FORMAT
 
 _DRAW_GRAPH = False
-_REGENERATE_RATES = True
-_RECRAWL_USER_INFO = False
+_REGENERATE_RATES = False
+_RECRAWL_USER_INFO = True
 _DEBUG = True
 
 _DELTA = 4
@@ -162,8 +162,9 @@ def gather_rates(seeds, cache, top_news, months, delta):
                 _, _, seed_time = seeds[url]
                 if Util.is_in_dataset(seed_time, DataSet.ALL):
                   user_id = tokens[_TWEETFILE_USER_ID_INDEX]
-                  created = datetime.strptime(tokens[_TWEETFILE_CREATED_AT_INDEX],
-                                              _DATETIME_FORMAT)
+                  created = datetime.strptime(
+                      tokens[_TWEETFILE_CREATED_AT_INDEX],
+                      _DATETIME_FORMAT)
                   if not url in participants:
                     participants[url] = NewsParticipants(delta)
                   participants[url].broadcast(user_id, created)
@@ -226,7 +227,7 @@ def output_data(user_to_rate):
       out_file.write('%s\t%s\n' % (user_id, rate))
 
 
-def get_updated_user_info(user_to_rate):
+def get_missing_user_info(user_to_rate):
   """Get user info for any users not already crawled.
 
   Keyword Arguments:
@@ -241,15 +242,23 @@ def get_updated_user_info(user_to_rate):
   for user_id in user_to_rate:
     if not user_id in user_info:
       users_without_info.add(user_id)
-  (new_user_info,
-   user_ids_not_found) = crawl_users.get_user_info(tweepy.API(),
-                                                   users_without_info) 
-  user_info.update([(str(user.id), user) for user in new_user_info])
-  for user_id in user_ids_not_found:
-    if user_id in user_to_rate:
-      del user_to_rate[user_id]
-  return user_info
-            
+  crawl_users.get_user_info(tweepy.API(), users_without_info)
+
+
+def remove_rates_for_missing_users():
+  """Removes rate info for any users for whom info could not be found."""
+  user_to_rate = load_rates()
+  user_info = crawl_users.load_user_info()
+  user_ids_to_remove = set()
+  for user_id in user_to_rate:
+    if user_id not in user_info:
+      user_ids_to_remove.add(user_id)
+
+  for user_id in user_ids_to_remove:
+    del user_to_rate[user_id]
+
+  output_data(user_to_rate)
+
 
 def run():
   """The main logic of this analysis."""
@@ -274,12 +283,8 @@ def run():
     user_to_rate = load_rates()
     if _DEBUG:
       user_to_rate = dict(user_to_rate.items()[:10])
-    else:
-      num_users = min(len(user_to_rate), _MAX_USERS)
-      user_to_rate = dict(user_to_rate.items()[:num_users])
-    user_info = get_updated_user_info(user_to_rate)
-    crawl_users.output_users(user_info.values())
-
+    get_missing_user_info(user_to_rate)
+    remove_rates_for_missing_users()
 
   if _DRAW_GRAPH:
     user_to_rate = load_rates()
