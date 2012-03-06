@@ -37,6 +37,7 @@ _DEBUG = True
 
 _DELTA = 4
 _SIZE_TOP_NEWS = .02
+_MAX_USERS = 20000
 
 _LOG_FILE = 'a_social_hub_bias.log'
 _OUTPUT_DIR = '../data/SocialHubBias/'
@@ -273,6 +274,9 @@ def run():
     user_to_rate = load_rates()
     if _DEBUG:
       user_to_rate = dict(user_to_rate.items()[:10])
+    else:
+      num_users = min(len(user_to_rate), _MAX_USERS)
+      user_to_rate = dict(user_to_rate.items()[:num_users])
     user_info = get_updated_user_info(user_to_rate)
     crawl_users.output_users(user_info.values())
 
