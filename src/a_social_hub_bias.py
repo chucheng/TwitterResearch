@@ -6,6 +6,7 @@ import FileLog
 import Util
 import URLUtil
 import crawl_users
+import ground_truths
 from ground_truths import DataSet
 
 import os
@@ -29,11 +30,13 @@ from constants import _RATES_FILE_RATE_INDEX
 from constants import _WINDOW_MONTHS 
 from constants import _DATETIME_FORMAT
 
-_DRAW_GRAPH = True
-_REGENERATE_DATA = False
+_DRAW_GRAPH = False
+_REGENERATE_RATES = True
+_RECRAWL_USER_INFO = False
 _DEBUG = True
 
 _DELTA = 4
+_SIZE_TOP_NEWS = .02
 
 _LOG_FILE = 'a_social_hub_bias.log'
 _OUTPUT_DIR = '../data/SocialHubBias/'
@@ -124,7 +127,7 @@ def draw_graph(rates, num_followers):
 
 
 
-def gather_rates(seeds, cache, months, delta):
+def gather_rates(seeds, cache, top_news, months, delta):
   """Aggregates information accross every tweet.
 
   For every url found, the authors twitter id, the url, and the time at
@@ -154,14 +157,15 @@ def gather_rates(seeds, cache, months, delta):
             tweet_text = tokens[_TWEETFILE_TWEET_TEXT_INDEX]
             urls = URLUtil.parse_urls(tweet_text, cache)
             for url in urls:
-              _, _, seed_time = seeds[url]
-              if Util.is_in_dataset(seed_time, DataSet.ALL):
-                user_id = tokens[_TWEETFILE_USER_ID_INDEX]
-                created = datetime.strptime(tokens[_TWEETFILE_CREATED_AT_INDEX],
-                                            _DATETIME_FORMAT)
-                if not url in participants:
-                  participants[url] = NewsParticipants(delta)
-                participants[url].broadcast(user_id, created)
+              if url in top_news:
+                _, _, seed_time = seeds[url]
+                if Util.is_in_dataset(seed_time, DataSet.ALL):
+                  user_id = tokens[_TWEETFILE_USER_ID_INDEX]
+                  created = datetime.strptime(tokens[_TWEETFILE_CREATED_AT_INDEX],
+                                              _DATETIME_FORMAT)
+                  if not url in participants:
+                    participants[url] = NewsParticipants(delta)
+                  participants[url].broadcast(user_id, created)
   return participants
 
 
@@ -189,7 +193,7 @@ def calc_rates(news_to_participants):
         user_to_rate[user_id] = (participant.count, 1.)
 
   # Do division here so output method matches load method.
-  for user_id, (count, num_stories) in user_to_rate:
+  for user_id, (count, num_stories) in user_to_rate.items():
     user_to_rate[user_id] = count / num_stories
   return user_to_rate
 
@@ -253,22 +257,24 @@ def run():
     _OUTPUT_DIR += 'debug/'
     crawl_users._OUTPUT_DIR += 'debug/'
 
-  if _REGENERATE_DATA:
-    user_to_rate = {} 
-    if _DEBUG:
-      user_to_rate = load_rates()
-      user_to_rate = dict(user_to_rate.items()[:10])
-    else:
-      cache = Util.load_cache()
-      seeds = Util.load_seeds()
+  if _REGENERATE_RATES:
+    cache = Util.load_cache()
+    seeds = Util.load_seeds()
 
-      news_to_participants = gather_rates(seeds, cache, _WINDOW_MONTHS, _DELTA)
-      user_to_rate = calc_rates(news_to_participants)
+    gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.ALL)
+    target_news = ground_truths.find_target_news(gt_rankings, _SIZE_TOP_NEWS)
 
-    user_info = get_updated_user_info(user_to_rate)
-
-    crawl_users.output_users(user_info.values())
+    news_to_participants = gather_rates(seeds, cache, target_news,
+                                        _WINDOW_MONTHS, _DELTA)
+    user_to_rate = calc_rates(news_to_participants)
     output_data(user_to_rate)
+
+  if _RECRAWL_USER_INFO:
+    user_to_rate = load_rates()
+    if _DEBUG:
+      user_to_rate = dict(user_to_rate.items()[:10])
+    user_info = get_updated_user_info(user_to_rate)
+    crawl_users.output_users(user_info.values())
 
 
   if _DRAW_GRAPH:
