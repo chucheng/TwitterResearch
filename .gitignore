@@ -1,6 +1,9 @@
 data/
+data
 report/
 graph/
+log/
 tmp/
 untrack/
 *.pyc
+.*\.DS_STORE.*
