@@ -30,10 +30,10 @@ from constants import _RATES_FILE_RATE_INDEX
 from constants import _WINDOW_MONTHS 
 from constants import _DATETIME_FORMAT
 
-_DRAW_GRAPH = False
+_DRAW_GRAPH = True
 _REGENERATE_RATES = False
-_RECRAWL_USER_INFO = True
-_DEBUG = True
+_RECRAWL_USER_INFO = False
+_DEBUG = False
 
 _DELTA = 4
 _SIZE_TOP_NEWS = .02
@@ -47,7 +47,7 @@ _GRAPH_DIR = Util.get_graph_output_dir('SocialHubBias/')
 class Participant:
   """Contains information regarding a participant in a news story."""
 
-  def __init__(self, user_id, delta):
+  def __init__(self, user_id, delta, time):
     """Initialize a Participant instance.
 
     Keyword Arguments:
@@ -57,7 +57,7 @@ class Participant:
     """
     self.user_id = user_id
     self.deltatime = timedelta(hours=delta)
-    self.time_tweeted = None
+    self.time_tweeted = time
     self.count = 0
 
   def notify_tweet_found(self, time):
@@ -66,8 +66,6 @@ class Participant:
     Keyword Arguments:
     time -- (datetime) The time the tweet was tweeted.
     """
-    if self.count == 0:
-      self.time_tweeted = time
     if time - self.time_tweeted < self.deltatime:
       self.count += 1
 
@@ -99,7 +97,7 @@ class NewsParticipants:
       else:
         participant.notify_tweet_found(time)
     if new_participant:
-      self.participants.append(Participant(user_id, self.delta))
+      self.participants.append(Participant(user_id, self.delta, time))
 
 
 def draw_graph(rates, num_followers):
@@ -213,6 +211,20 @@ def load_rates():
   return user_to_rate
 
 
+def load_bad_users():
+  """Loads a set of 'blacklisted' user ids from disk."""
+  log('Loading bad users...')
+  Util.ensure_dir_exist(_OUTPUT_DIR)
+  bad_users = set()
+  if not os.path.exists(_OUTPUT_DIR + 'bad_users.tsv'):
+    return bad_users
+  with open(_OUTPUT_DIR + 'bad_users.tsv') as in_file:
+    for line in in_file:
+      user_id = line.strip()
+      bad_users.add(user_id)
+  return user_id
+
+
 def output_data(user_to_rate):
   """Outputs intermediary rate data to disk.
 
@@ -247,6 +259,7 @@ def get_missing_user_info(user_to_rate):
 
 def remove_rates_for_missing_users():
   """Removes rate info for any users for whom info could not be found."""
+  log('Removing rates for users who could not be found...')
   user_to_rate = load_rates()
   user_info = crawl_users.load_user_info()
   user_ids_to_remove = set()
@@ -258,6 +271,15 @@ def remove_rates_for_missing_users():
     del user_to_rate[user_id]
 
   output_data(user_to_rate)
+
+
+def remove_bad_users(user_to_rate):
+  """Removes 'blacklisted' users from loaded rate info."""
+  log('Removing rates for blacklisted users...')
+  bad_users = load_bad_users()
+  for user_id in bad_users:
+    if user_id in user_to_rate:
+      del user_to_rate[user_id]
 
 
 def run():
@@ -281,6 +303,7 @@ def run():
 
   if _RECRAWL_USER_INFO:
     user_to_rate = load_rates()
+    remove_bad_users(user_to_rate)
     if _DEBUG:
       user_to_rate = dict(user_to_rate.items()[:10])
     get_missing_user_info(user_to_rate)
@@ -292,8 +315,9 @@ def run():
     rates = []
     num_followers = []
     for user_id in user_to_rate:
-      rates.append(user_to_rate[user_id])
-      num_followers.append(user_info[user_id].followers_count)
+      if user_id in user_info:
+        rates.append(user_to_rate[user_id])
+        num_followers.append(user_info[user_id].followers_count)
     log('Outputting Graph...')
     draw_graph(rates, num_followers)
   log('Analysis done!')

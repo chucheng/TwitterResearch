@@ -47,13 +47,13 @@ def check_rate_limit_and_wait_if_needed(api): # pylint: disable-msg=C0103
       hits_remaining = api.rate_limit_status()['remaining_hits']
       if hits_remaining < 100:
         log('Rate limit status low, waiting for 15 min...')
-        time.sleep(15 * 60)
+        time.sleep(10 * 60)
       else:
         return
     except tweepy.error.TweepError, err: # pylint: disable-msg=E1101
       log('%s' % err)
-      log('Error checking wait limit status, waiting for 15 min...')
-      time.sleep(15 * 60)
+      log('Error checking wait limit status, waiting for 10 sec...')
+      time.sleep(10)
 
 
 def get_user_info(api, user_ids):
@@ -69,17 +69,28 @@ def get_user_info(api, user_ids):
   Util.ensure_dir_exist(_OUTPUT_DIR)
   with codecs.open(_OUTPUT_DIR + 'user_info.tsv', 'a',
                    encoding='utf-8') as out_file:
-    count = 1
-    for user_id in user_ids:
-      check_rate_limit_and_wait_if_needed(api)
-      log('%s: %s' % (count, user_id))
-      try:
-        tweepy_user = api.get_user(int(user_id))
-        user = User.from_tweepy_user(tweepy_user)
-        output_user(out_file, user)
-      except tweepy.error.TweepError, err: # pylint: disable-msg=E1101
-        log('%s (user_id: %s)' % (err, user_id))
-      count += 1
+    with codecs.open(_OUTPUT_DIR + 'bad_user.tsv', 'a',
+                     encoding='utf-8') as bad_file:
+      count = 1
+      for user_id in user_ids:
+        check_rate_limit_and_wait_if_needed(api)
+        retry_5xx = 3
+        while retry_5xx > 0:
+          try:
+            log('%s: %s' % (count, user_id))            
+            tweepy_user = api.get_user(int(user_id))
+            user = User.from_tweepy_user(tweepy_user)
+            output_user(out_file, user)
+            retry_5xx = 0
+          except tweepy.error.TweepError, err: # pylint: disable-msg=E1101
+            log('%s (user_id: %s)' % (err, user_id))
+            if err.reason.startswith("Twitter error response: status code = 5"):
+              retry_5xx -= 1
+              log('Retrying user id %s' % user_id)
+            else:
+              retry_5xx = 0
+              bad_file.write('%s\n' % user_id)
+        count += 1
 
 
 def load_user_info():
@@ -105,7 +116,7 @@ def load_user_info():
       created_at = tokens[_USER_INFO_FILE_CREATED_AT_INDEX]
       listed_count = int(tokens[_USER_INFO_FILE_LISTED_COUNT_INDEX])
       verified = tokens[_USER_INFO_FILE_VERIFIED_INDEX].strip() == True
-      utc_offset = int(tokens[_USER_INFO_FILE_UTC_INDEX])
+      utc_offset = tokens[_USER_INFO_FILE_UTC_INDEX]
       time_zone = tokens[_USER_INFO_FILE_TIME_ZONE_INDEX]
       lang = tokens[_USER_INFO_FILE_LANG_INDEX]
       user = User(user_id, screen_name, name, followers_count, statuses_count,
@@ -121,12 +132,54 @@ def output_user(out_file, user):
   Keyword Arguments:
   users -- (Set<tweepy.model.User>)
   """
+  user_id = ''
+  if user.id:
+    user_id = str(user.id)
+  screen_name = ''
+  if user.screen_name:
+    screen_name = user.screen_name.strip()
+    screen_name = ('%r' % screen_name)
+    screen_name = screen_name[2:-1] if screen_name[0] == 'u' else screen_name[1:-1]
+  name = ''
+  if user.name:
+    name = user.name.strip()
+    name = ('%r' % name)
+    name = name[2:-1] if name[0] == 'u' else name[1:-1]
+  followers_count = 0
+  if user.followers_count:
+    followers_count = user.followers_count
+  statuses_count = 0 
+  if user.statuses_count:
+    statuses_count = user.statuses_count
+  friends_count = 0
+  if user.friends_count:
+    friends_count = user.friends_count
+  created_at = ''
+  if user.created_at:
+    created_at = str(created_at)
+  listed_count = 0
+  if user.listed_count:
+    listed_count = user.listed_count
+  verified = ''
+  if user.verified != None:
+    verified = str(user.verified)
+  utc_offset = ''
+  if user.utc_offset:
+    utc_offset = str(utc_offset)
+  time_zone = ''
+  if user.time_zone:
+    time_zone = user.time_zone.strip()
+    time_zone = ('%r' % time_zone)
+    time_zone = time_zone[2:-1] if time_zone[0] == 'u' else time_zone[1:-1]
+  lang = ''
+  if user.lang:
+    lang = user.lang.strip()
+    lang = ('%r' % lang)
+    lang = lang[2:-1] if lang[0] == 'u' else lang[1:-1]
   out_file.write(u'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n'
-                 % (user.id, user.screen_name, user.name,
-                    user.followers_count, user.statuses_count,
-                    user.friends_count, user.created_at, user.listed_count,
-                    user.verified, user.utc_offset, user.time_zone,
-                    user.lang))
+                 % (user_id, screen_name, name, followers_count, statuses_count,
+                    friends_count, created_at, listed_count, verified,
+                    utc_offset, time_zone, lang))
 
 
 class User:
@@ -151,10 +204,7 @@ class User:
       self.created_at = created_at
     self.listed_count = listed_count
     self.verified = verified
-    if isinstance(utc_offset, str):
-      self.utc_offset = int(utc_offset)
-    else:
-      self.utc_offset = utc_offset
+    self.utc_offset = utc_offset
     self.time_zone = time_zone
     self.lang = lang
 
