@@ -11,6 +11,7 @@ __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 import Util
 import FileLog
 import ground_truths
+import crawl_users
 from ground_truths import DataSet
 
 import matplotlib
@@ -29,6 +30,9 @@ _GRAPH_DIR = Util.get_graph_output_dir('RateIncrease/')
 _SIZE_TOP_NEWS = .02
 
 _NYT_USER_ID = '807095'
+
+_MAIN_ANALYSIS = False
+_SECONDARY_ANALYSIS = True
 
 
 def draw_graph(counts_nyt, counts_not_nyt, (nyt_x, nyt_y),  num, param_str):
@@ -136,39 +140,83 @@ def aggregate_counts(counts, delta):
   return agg_counts
 
 
+def find_additional_info(url, user_info, delta):
+  """Gathers additional information about a given url.
+
+  Keyword Arguments:
+  url -- (str) The url to find additional info for.
+  user_info -- (Dict<str, crawl_users.User>) user_id -> crawl_users.User
+  delta -- (int) The delta for the time window, given in hours.
+
+  Returns:
+  additional_info -- (List<(str, (str, int, int))>)
+                     [(user_id, (followers_count, screen_name, minutes))...]
+  """
+  log('Finding addtional information for: %s with delta %s...' % (url, delta))
+  additional_info = {}
+  with open('../data/FolkWisdom/time_deltas.tsv', 'r') as in_file:
+    for line in in_file:
+      tokens = line.split('\t')
+      tweet_delta = int(tokens[_TIMEDELTAS_FILE_DELTA_INDEX])
+      if tweet_delta < (delta * 3600):
+        tweet_url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
+        if tweet_url == url:
+          tweet_author_id = tokens[_TIMEDELTAS_FILE_USER_ID_INDEX]
+          if tweet_author_id in user_info:
+            user = user_info[tweet_author_id]
+            additional_info[tweet_author_id] = (user.followers_count,
+                                                user.screen_name,
+                                                tweet_delta / 60)
+  return sorted(additional_info.items(), key=lambda x: x[1][0], reverse=True)
+
+
 def run():
   """Main logic for this analysis."""
-  seeds = Util.load_seeds()
-  gt_ranks = ground_truths.get_gt_rankings(seeds, DataSet.ALL)
-  target_news = ground_truths.find_target_news(gt_ranks, _SIZE_TOP_NEWS)
-  for delta in _DELTAS:
-    log('Performing analysis for delta %s' % delta)
-    param_str = 'd%s' % delta
-    Util.ensure_dir_exist(_GRAPH_DIR + '%s/' % param_str)
-    Util.ensure_dir_exist(_GRAPH_DIR + '%s/info/' % param_str)
+  if _MAIN_ANALYSIS:
+    seeds = Util.load_seeds()
+    gt_ranks = ground_truths.get_gt_rankings(seeds, DataSet.ALL)
+    target_news = ground_truths.find_target_news(gt_ranks, _SIZE_TOP_NEWS)
+    for delta in _DELTAS:
+      log('Performing analysis for delta %s' % delta)
+      param_str = 'd%s' % delta
+      Util.ensure_dir_exist(_GRAPH_DIR + '%s/' % param_str)
+      Util.ensure_dir_exist(_GRAPH_DIR + '%s/info/' % param_str)
 
-    (counts, news_nyt_participant,
-     news_nyt_not_participant, when_nyt_tweeted) = find_counts(target_news,
-                                                               delta)
-    agg_counts = aggregate_counts(counts, delta)
+      (counts, news_nyt_participant,
+       news_nyt_not_participant, when_nyt_tweeted) = find_counts(target_news,
+                                                                 delta)
+      agg_counts = aggregate_counts(counts, delta)
 
-    with open(_GRAPH_DIR + '%s/info/stats.txt' % param_str, 'w') as out_file:
-      out_file.write('Num stories total: %s\n' % len(target_news))
-      out_file.write('Num NYT Participant: %s\n' % len(news_nyt_participant))
-      out_file.write('Num NYT Not Participant: %s\n'
-                     % len(news_nyt_not_participant))
+      with open(_GRAPH_DIR + '%s/info/stats.txt' % param_str, 'w') as out_file:
+        out_file.write('Num stories total: %s\n' % len(target_news))
+        out_file.write('Num NYT Participant: %s\n' % len(news_nyt_participant))
+        out_file.write('Num NYT Not Participant: %s\n'
+                       % len(news_nyt_not_participant))
 
-    with open(_GRAPH_DIR + '%s/info/legend.tsv' % param_str, 'w') as out_file:
-      for i in range(min(50, min(len(news_nyt_participant),
-                                 len(news_nyt_not_participant)))):
-        log('Outputting graph %s...' % i)
-        url_nyt = news_nyt_participant.pop()
-        url_not_nyt = news_nyt_not_participant.pop()
-        nyt_tweeted_min = when_nyt_tweeted[url_nyt]
-        out_file.write('%s\t%s\t%s\n' % (i, url_nyt, url_not_nyt))
-        draw_graph(agg_counts[url_nyt], agg_counts[url_not_nyt],
-                   (nyt_tweeted_min, agg_counts[url_nyt][nyt_tweeted_min]), i,
-                   param_str)
+      with open(_GRAPH_DIR + '%s/info/legend.tsv' % param_str, 'w') as out_file:
+        for i in range(min(50, min(len(news_nyt_participant),
+                                   len(news_nyt_not_participant)))):
+          log('Outputting graph %s...' % i)
+          url_nyt = news_nyt_participant.pop()
+          url_not_nyt = news_nyt_not_participant.pop()
+          nyt_tweeted_min = when_nyt_tweeted[url_nyt]
+          out_file.write('%s\t%s\t%s\n' % (i, url_nyt, url_not_nyt))
+          draw_graph(agg_counts[url_nyt], agg_counts[url_not_nyt],
+                     (nyt_tweeted_min, agg_counts[url_nyt][nyt_tweeted_min]), i,
+                     param_str)
+
+  if _SECONDARY_ANALYSIS:
+    url_str = ('http://thelede.blogs.nytimes.com/2011/08/21/'
+               'latest-updates-on-the-battle-for-tripoli/')
+    user_info = crawl_users.load_user_info()
+    for url, delta, legend_num in [(url_str, 8, 28)]:
+      additional_info = find_additional_info(url, user_info, delta)
+      log('Outputting additional info to disk...')
+      with open(_GRAPH_DIR + 'additional_info_%s_%s.tsv' % (delta, legend_num),
+                'w') as out_file:
+        for user_id, (num_followers, screen_name, minutes) in additional_info:
+          out_file.write('%s\t%s\t%s\t%s\n' % (user_id, screen_name,
+                                               num_followers, minutes))
 
   log('Analysis complete!')
 
