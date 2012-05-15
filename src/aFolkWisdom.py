@@ -32,6 +32,7 @@ import Util
 
 import experts
 import basic_groups
+import even_groups
 import mixed_model
 import ground_truths
 from ground_truths import DataSet
@@ -53,6 +54,9 @@ _LOG_FILE = 'aFolkWisdom.log'
 
 _SIZE_EXPERTS = .10
 _SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
+
+_NUM_GROUPS = 5
+_SIZE_OF_GROUP_IN_PERCENT = .02
 
 _CATEGORIES = []
 # Comment categories in/out individually as needed.
@@ -393,6 +397,12 @@ def run():
       log('Num active: %s' % len(active_users))
       log('Num common: %s' % len(common_users))
 
+      num_users_eg, groups = even_groups.group_users(delta,
+                                                     _NUM_GROUPS,
+                                                     _SIZE_OF_GROUP_IN_PERCENT,
+                                                     category)
+      log('Num users in evenly distributed groups: %s' % len(groups[0]))
+
       experts_precision = experts.select_experts_precision(
           newsaholics.union(active_users), num_users, delta, _SIZE_EXPERTS,
           category)
@@ -426,6 +436,8 @@ def run():
                                                  super_experts,
                                                  category)
 
+      groups_rankings = even_groups.get_rankings(delta, seeds, groups,
+                                                 category)
 
 
       num_votes_market = 0
@@ -469,6 +481,13 @@ def run():
       log('Num expert_s rankings: %s' % len(expert_s_rankings))
       log('Num expert_s votes: %s' % num_votes_expert_s)
 
+      for group_rankings in groups_rankings:
+        num_votes_group = 0
+        for url, count in group_rankings:
+          num_votes_group += count
+        log('Num rankings group: %s' % len(group_rankings))
+        log('Num votes group: %s' % num_votes_group)
+
 
       size_market_unfiltered = '0'
       with open('../data/FolkWisdom/size_of_market_unfiltered.txt') as in_file:
@@ -481,6 +500,7 @@ def run():
         output_file.write('Number of Common Users: %s\n' % len(common_users))
         output_file.write('Number of Experts: %s\n' % len(experts_precision))
         output_file.write('Number of Super Experts: %s\n' % len(super_experts))
+        output_file.write('Numver of Even Group users per group: %s\n' % num_users_eg)
         output_file.write('Number of Users (Total): %s\n'
                           % (len(newsaholics) + len(active_users)
                              + len(common_users)))
@@ -552,6 +572,11 @@ def run():
       for i in range(min(len(expert_s_rankings), 5)):
         url, count = expert_s_rankings[i]
         log('[%s] %s\t%s' %(i, url.strip(), count))
+
+      for group_rankings in groups_rankings:
+        for i in range(min(len(group_rankings), 5)):
+          url, count = group_rankings[i]
+          log('[%s] %s\t%s' %(i, url.strip(), count))
         
       market_rank_to_url = {}
       newsaholic_rank_to_url = {}
@@ -649,7 +674,14 @@ def run():
 
       mixed_precisions, mixed_recalls = calc_precision_recall(gt_rankings, 
                                                               mixed_rankings)
-      
+
+      groups_precisions = []
+      groups_recalls = []
+      for group_rankings in groups_rankings:
+        group_precisions, group_recalls = calc_precision_recall(gt_rankings,
+                                                                group_rankings)
+        groups_precisions.append(group_precisions)
+        groups_recalls.append(group_recalls)
 
       log('-----------------------------------')
       log('Mixed (min) Top 5')
@@ -658,6 +690,7 @@ def run():
         log('[%s] %s\t%s' %(i + 1, url, count))
       log('-----------------------------------')
 
+      # TODO: Add group rankings to this?
       with open('%sranking_comparisons_%s.tsv'
                 % (info_output_dir, run_params_str), 'w') as out_file:
         for gt_rank, (gt_url, _) in enumerate(gt_rankings):
@@ -734,6 +767,13 @@ def run():
       with open('%smixed_rankings_%s.tsv'
                 % (info_output_dir, run_params_str), 'w') as output_file:
         for rank, (url, count) in enumerate(mixed_rankings):
+          output_file.write('%s\t%s\t(%s,%s)\n'
+                            % (url.strip(), count, rank,
+                            ground_truth_url_to_rank[url]))
+      
+      for i, group_rankings in enumerate(groups_rankings):
+        with open('%sgroup_%s_rankings_%s.tsv'
+                  % (info_output_dir, i, run_params_str), 'w') as output_file:
           output_file.write('%s\t%s\t(%s,%s)\n'
                             % (url.strip(), count, rank,
                             ground_truth_url_to_rank[url]))
@@ -819,6 +859,15 @@ def run():
       log('Drawing mixed model precision-topnews graph...')
       mixed_model.draw_precision_mixed(market_precisions, mixed_precisions,
                                        run_params_str)
+
+      log('Drawing even group model precision-recall graph...')
+      even_groups.draw_precision_recall(market_precisions, market_recalls,
+                                        groups_precisions, groups_recalls,
+                                        run_params_str);
+
+      log('Drawing even group model precision graph...')
+      even_groups.draw_precision(market_precisions, groups_precisions,
+                                 run_params_str);
 
 def log(message):
   """Helper method to modularize the format of log messages.
