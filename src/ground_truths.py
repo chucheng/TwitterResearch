@@ -7,6 +7,7 @@ import Util
 import URLUtil
 
 from constants import _TIMEDELTAS_FILE_URL_INDEX
+from constants import _TIMEDELTAS_FILE_SOURCE_INDEX
 
 def find_target_news(gt_rankings, size_top_news):
   """Find the target news, which is top 2% of ground truth.
@@ -42,6 +43,7 @@ def get_gt_rankings(seeds, dataset, category=None):
   with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
     for line in input_file:
       tokens = line.split('\t')
+      source = tokens[_TIMEDELTAS_FILE_SOURCE_INDEX].strip()
       url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
       if url in seeds:
         _, _, seed_time = seeds[url]
