@@ -16,6 +16,7 @@ from constants import _TWEETFILE_USER_ID_INDEX
 from constants import _TWEETFILE_TWEET_ID_INDEX
 from constants import _TWEETFILE_CREATED_AT_INDEX
 from constants import _TWEETFILE_TWEET_TEXT_INDEX
+from constants import _TWEETFILE_SOURCE_INDEX
 from constants import _DATETIME_FORMAT
 from constants import _TRAINING_SET_MONTHS
 from constants import _FULL_SET_MONTHS
@@ -24,7 +25,7 @@ import os
 from datetime import datetime
 
 _LOG_FILE = 'gen_seeds_and_deltas.log'
-_REGENERATE_SEEDS = True
+_REGENERATE_SEEDS = False
 
 
 def find_delta_times(months, seeds, cache):
@@ -52,11 +53,12 @@ def find_delta_times(months, seeds, cache):
             tweet_id = tokens[_TWEETFILE_TWEET_ID_INDEX]
             tweet_text = tokens[_TWEETFILE_TWEET_TEXT_INDEX]
             urls = URLUtil.parse_urls(tweet_text, cache)
+            source = tokens[_TWEETFILE_SOURCE_INDEX]
             for url in urls:
               seed_tweet_id, _, seed_time = seeds[url]
               category = URLUtil.extract_category(url)
               if tweet_id == seed_tweet_id:
-                time_deltas[tweet_id] = (user_id, 0, url, category)
+                time_deltas[tweet_id] = (user_id, 0, url, category, source)
               else:
                 created = datetime.strptime(tokens[_TWEETFILE_CREATED_AT_INDEX],
                                             _DATETIME_FORMAT)
@@ -66,13 +68,18 @@ def find_delta_times(months, seeds, cache):
                 time_delta_in_seconds = (time_delta.days * 86400
                                          + time_delta.seconds)
                 time_deltas[tweet_id] = (user_id, time_delta_in_seconds, url,
-                                         category)
+                                         category, source)
   sorted_deltas = sorted(time_deltas.items(), key=lambda x: x[1][1],
                          reverse=False)
+  for (tweet_id, tp) in sorted_deltas:
+    if len(tp) < 5:
+      print tp
   with open('../data/FolkWisdom/time_deltas.tsv', 'w') as output_file:
-    for (tweet_id, (user_id, time_delta, url, category)) in sorted_deltas:
-      output_file.write('%s\t%s\t%s\t%s\t%s\n' % (tweet_id, user_id, time_delta,
-                                                  url, category))
+    for (tweet_id, (user_id, time_delta, url,
+                    category, source)) in sorted_deltas:
+      output_file.write('%s\t%s\t%s\t%s\t%s\t%s\n' % (tweet_id, user_id,
+                                                      time_delta, url, category,
+                                                      source))
   log('Wrote time deltas to disk')
 
 

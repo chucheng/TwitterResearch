@@ -19,6 +19,7 @@ from constants import _TIMEDELTAS_FILE_URL_INDEX
 from constants import _TIMEDELTAS_FILE_USER_ID_INDEX
 from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
+from constants import _TIMEDELTAS_FILE_SOURCE_INDEX
 from constants import _HITS_MISSES_FILE_USER_ID_INDEX
 from constants import _HITS_MISSES_FILE_MISSES_INDEX
 from constants import _HITS_MISSES_FILE_HITS_INDEX
@@ -26,6 +27,7 @@ from constants import _HITS_MISSES_FILE_HITS_INDEX
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 
 _BETA = 2
+Z_SCORE = 1.645 # 95% 1 sided
 
 
 def draw_precision_experts(market_precisions, expert_p_precisions,
@@ -157,6 +159,9 @@ def gather_tweet_counts(hours, seeds, experts_precision, experts_fscore,
   with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
     for line in input_file:
       tokens = line.split('\t')
+      source = tokens[_TIMEDELTAS_FILE_SOURCE_INDEX].strip()
+      if source == 'twitterfeed':
+        continue
       url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
       user_id = tokens[_TIMEDELTAS_FILE_USER_ID_INDEX]
       time_delta = timedelta(seconds=int(tokens[_TIMEDELTAS_FILE_DELTA_INDEX]))
@@ -261,10 +266,11 @@ def select_experts_ci(num_users, delta, size_experts, category=None):
       misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
       trials = hits + misses
       p_val = float(hits + 2) / (trials + 4)
-      error = 1.96 * sqrt((p_val * (1 - p_val)) / float(trials + 4))
+      error = Z_SCORE * sqrt((p_val * (1 - p_val)) / float(trials + 4))
       low = max(0.0, p_val - error)
       high = min(1.0, p_val + error)
-      avg_of_ci = (low + high) / 2.0
+      # avg_of_ci = (low + high) / 2.0
+      avg_of_ci = low
       users[user_id] = avg_of_ci
   users_sorted = sorted(users.items(), key=lambda x: x[1], reverse=True)
   num_experts_to_select = int(num_users * size_experts)

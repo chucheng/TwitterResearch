@@ -18,6 +18,7 @@ from constants import _TIMEDELTAS_FILE_URL_INDEX
 from constants import _TIMEDELTAS_FILE_USER_ID_INDEX
 from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
+from constants import _TIMEDELTAS_FILE_SOURCE_INDEX
 from constants import _USER_ACTIVITY_FILE_ID_INDEX
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
@@ -155,6 +156,9 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, category=None):
   with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
     for line in input_file:
       tokens = line.split('\t')
+      source = tokens[_TIMEDELTAS_FILE_SOURCE_INDEX].strip()
+      if source == 'twitterfeed':
+        continue
       url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
       user_id = tokens[_TIMEDELTAS_FILE_USER_ID_INDEX]
       time_delta = timedelta(seconds=int(tokens[_TIMEDELTAS_FILE_DELTA_INDEX]))
