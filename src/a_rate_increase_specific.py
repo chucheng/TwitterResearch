@@ -45,14 +45,31 @@ def draw_graph(counts_nyt, counts_not_nyt, annotations, param_str):
   nyt_plot = axs.plot(counts_nyt, linewidth=2)
   not_nyt_plot = axs.plot(counts_not_nyt, '--', linewidth=2)
 
+  # nytimes
   (x, y, screen_name) = annotations[0]
-  axs.annotate(screen_name, xy=(x, y), xytext=(x + 5, y + 5),
-               arrowprops=dict(facecolor='black', shrink=0.05, width=0.50,
-                               headwidth=5))
+  axs.annotate(screen_name, xy=(x, y), xytext=(x - 100, y + 10), fontsize=16,
+               arrowprops=dict(facecolor='black', shrink=0.05, width=0.75,
+                               headwidth=10))
+  # evertuts
   (x, y, screen_name) = annotations[1]
-  axs.annotate(screen_name, xy=(x, y), xytext=(x + 15, y - 15),
-               arrowprops=dict(facecolor='black', shrink=0.05, width=0.50,
-                               headwidth=5))
+  axs.annotate(screen_name, xy=(x, y), xytext=(x - 100,  y + 20), fontsize=16,
+               arrowprops=dict(facecolor='black', shrink=0.05, width=0.75,
+                               headwidth=10))
+  # nytjim
+  (x, y, screen_name) = annotations[2]
+  axs.annotate(screen_name, xy=(x, y), xytext=(x - 100,  y), fontsize=16,
+               arrowprops=dict(facecolor='black', shrink=0.05, width=0.75,
+                               headwidth=10))
+  # nytimesglobal
+  (x, y, screen_name) = annotations[3]
+  axs.annotate(screen_name, xy=(x, y), xytext=(x + 30,  y), fontsize=16,
+               arrowprops=dict(facecolor='black', shrink=0.05, width=0.75,
+                               headwidth=10))
+  # Larryferlazzo
+  (x, y, screen_name) = annotations[4]
+  axs.annotate(screen_name, xy=(x, y), xytext=(x - 150,  y + 50), fontsize=16,
+               arrowprops=dict(facecolor='black', shrink=0.05, width=0.75,
+                               headwidth=10))
   
   plt.legend([nyt_plot, not_nyt_plot],
              ['@nytimes is participant', '@nytimes not participant'],
@@ -198,6 +215,9 @@ def run():
       annotations.append((nyt_tweeted_min,
                           agg_counts[_STORY_NYT][nyt_tweeted_min], '@nytimes'))
       annotations.append((204, agg_counts[_STORY_NYT][204], '@evertuts'))
+      annotations.append((193, agg_counts[_STORY_NYT][193], '@nytjim'))
+      annotations.append((194, agg_counts[_STORY_NYT][194], '@nytimesglobal'))
+      annotations.append((222, agg_counts[_STORY_NYT][222], '@Larryferlazzo'))
       draw_graph(agg_counts[_STORY_NYT], agg_counts[_STORY_NOT_NYT],
                  annotations, param_str)
 
