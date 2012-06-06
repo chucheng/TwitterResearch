@@ -42,17 +42,16 @@ matplotlib.use("Agg")
 
 from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
-import matplotlib.axis
 
 import math
 from math import sqrt
 
-from constants import _DELTAS
+# from constants import _DELTAS
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
 
-_SIZE_EXPERTS = .10
+_SIZE_EXPERTS = .02
 _SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
 
 _NUM_GROUPS = 5
@@ -61,12 +60,12 @@ _SIZE_OF_GROUP_IN_PERCENT = .02
 _CATEGORIES = []
 # Comment categories in/out individually as needed.
 _CATEGORIES.append(None)
-_CATEGORIES.append('world')
+# _CATEGORIES.append('world')
 # _CATEGORIES.append('business')
 # _CATEGORIES.append('opinion')
 _CATEGORIES.append('sports')
 # _CATEGORIES.append('us')
-_CATEGORIES.append('technology')
+# _CATEGORIES.append('technology')
 # _CATEGORIES.append('movies')
 
 
@@ -385,7 +384,8 @@ def run():
     target_news = ground_truths.find_target_news(gt_rankings, _SIZE_TOP_NEWS)
     log('Size target_news: %s' % len(target_news))
 
-    for delta in _DELTAS:
+    # for delta in _DELTAS:
+    for delta in [4, 8]:
       run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
                                            int(_SIZE_EXPERTS * 100), category)
       info_output_dir = '../graph/FolkWisdom/%s/info/' % run_params_str
@@ -420,7 +420,6 @@ def run():
       log('Num experts (fscore): %s' % len(experts_fscore))
       log('Num experts (ci): %s' % len(experts_ci))
       log('Num Super Experts: %s' %len(super_experts))
-
 
       log('Finding rankings with an %s hour delta.' % delta)
       (market_rankings, newsaholic_rankings,
@@ -498,9 +497,18 @@ def run():
         output_file.write('Number of Newsaholics: %s\n' % len(newsaholics))
         output_file.write('Number of Active Users: %s\n' % len(active_users))
         output_file.write('Number of Common Users: %s\n' % len(common_users))
-        output_file.write('Number of Experts: %s\n' % len(experts_precision))
+        output_file.write('\n');
+        output_file.write('Number of Precision Experts: %s\n' % len(experts_precision))
+        output_file.write('Number of F-Score Experts: %s\n' % len(experts_fscore))
+        output_file.write('Number of CI Experts: %s\n' % len(experts_ci))
+        output_file.write('Number of Precision and F-Score Experts: %s\n'
+                          % len(experts_precision.intersection(experts_fscore)))
+        output_file.write('Number of Precision and CI Experts: %s\n'
+                          % len(experts_precision.intersection(experts_ci)))
+        output_file.write('Number of F-Score and CI Experts: %s\n'
+                          % len(experts_fscore.intersection(experts_ci)))
         output_file.write('Number of Super Experts: %s\n' % len(super_experts))
-        output_file.write('Numver of Even Group users per group: %s\n' % num_users_eg)
+        output_file.write('\n');
         output_file.write('Number of Users (Total): %s\n'
                           % (len(newsaholics) + len(active_users)
                              + len(common_users)))
@@ -514,6 +522,7 @@ def run():
                           % num_votes_active)
         output_file.write('Number of votes by Common Users: %s\n'
                           % num_votes_common)
+        output_file.write('\n');
         output_file.write('Number of votes by Expert (Precision) Users: %s\n'
                 % num_votes_expert_precision) 
         output_file.write('Number of votes by Expert (fscore) Users: %s\n'
@@ -522,6 +531,7 @@ def run():
                 % num_votes_expert_ci) 
         output_file.write('Number of votes by Super Experts: %s\n'
                           % num_votes_expert_s)
+        output_file.write('\n')
         output_file.write('Total Number of votes cast: %s\n'
                           % (num_votes_newsaholics + num_votes_active
                              + num_votes_common))
@@ -602,30 +612,6 @@ def run():
         expert_c_rank_to_url[rank] = url
       for rank, (url, count) in enumerate(expert_s_rankings):
         expert_s_rank_to_url[rank] = url
-
-      avg_diffs_newsaholic = calculate_diff_avg(ground_truth_url_to_rank,
-                                                newsaholic_rank_to_url)
-      avg_diffs_market = calculate_diff_avg(ground_truth_url_to_rank,
-                                            market_rank_to_url)
-      avg_diffs_active = calculate_diff_avg(ground_truth_url_to_rank,
-                                            active_rank_to_url)
-      avg_diffs_common = calculate_diff_avg(ground_truth_url_to_rank,
-                                            common_rank_to_url)
-
-      avg_diffs_expert_p = calculate_diff_avg(ground_truth_url_to_rank,
-                                              expert_p_rank_to_url)
-      avg_diffs_expert_f = calculate_diff_avg(ground_truth_url_to_rank,
-                                              expert_f_rank_to_url)
-      avg_diffs_expert_c = calculate_diff_avg(ground_truth_url_to_rank,
-                                              expert_c_rank_to_url)
-      avg_diffs_expert_s = calculate_diff_avg(ground_truth_url_to_rank,
-                                              expert_s_rank_to_url)
-
-      draw_avg_diff_graph(avg_diffs_newsaholic, avg_diffs_market,
-                          avg_diffs_active, avg_diffs_common,
-                          avg_diffs_expert_p, avg_diffs_expert_f,
-                          avg_diffs_expert_c, avg_diffs_expert_s,
-                          run_params_str)
 
       market_url_to_rank = {}
       precision_url_to_rank = {}
@@ -863,11 +849,12 @@ def run():
       log('Drawing even group model precision-recall graph...')
       even_groups.draw_precision_recall(market_precisions, market_recalls,
                                         groups_precisions, groups_recalls,
-                                        run_params_str);
+                                        run_params_str)
 
       log('Drawing even group model precision graph...')
       even_groups.draw_precision(market_precisions, groups_precisions,
-                                 run_params_str);
+                                 run_params_str)
+
 
 def log(message):
   """Helper method to modularize the format of log messages.

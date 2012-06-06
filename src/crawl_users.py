@@ -29,6 +29,7 @@ from constants import _USER_INFO_FILE_VERIFIED_INDEX
 from constants import _USER_INFO_FILE_UTC_INDEX
 from constants import _USER_INFO_FILE_TIME_ZONE_INDEX
 from constants import _USER_INFO_FILE_LANG_INDEX
+from constants import _USER_INFO_FILE_TIMESTAMP_CRAWLED_INDEX
 
 from constants import _DATETIME_FORMAT
 
@@ -119,9 +120,10 @@ def load_user_info():
       utc_offset = tokens[_USER_INFO_FILE_UTC_INDEX]
       time_zone = tokens[_USER_INFO_FILE_TIME_ZONE_INDEX]
       lang = tokens[_USER_INFO_FILE_LANG_INDEX]
+      timestamp_crawled = tokens[_USER_INFO_FILE_TIMESTAMP_CRAWLED_INDEX].strip()
       user = User(user_id, screen_name, name, followers_count, statuses_count,
                   friends_count, created_at, listed_count, verified, utc_offset,
-                  time_zone, lang)
+                  time_zone, lang, timestamp_crawled)
       users[user_id] = user
   return users
 
@@ -176,10 +178,10 @@ def output_user(out_file, user):
     lang = user.lang.strip()
     lang = ('%r' % lang)
     lang = lang[2:-1] if lang[0] == 'u' else lang[1:-1]
-  out_file.write(u'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n'
+  out_file.write(u'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n'
                  % (user_id, screen_name, name, followers_count, statuses_count,
                     friends_count, created_at, listed_count, verified,
-                    utc_offset, time_zone, lang))
+                    utc_offset, time_zone, lang, datetime.now()))
 
 
 class User:
@@ -190,7 +192,8 @@ class User:
   """
   def __init__(self, user_id, screen_name, name, followers_count,
                statuses_count, friends_count, created_at,
-               listed_count, verified, utc_offset, time_zone, lang):
+               listed_count, verified, utc_offset, time_zone, lang,
+               timestamp_crawled):
     """Create a new instance of this class."""
     self.id = user_id # pylint: disable-msg=C0103
     self.screen_name = screen_name
@@ -207,6 +210,10 @@ class User:
     self.utc_offset = utc_offset
     self.time_zone = time_zone
     self.lang = lang
+    if isinstance(timestamp_crawled, str):
+      self.timestamp_crawled = datetime.strptime(timestamp_crawled, _DATETIME_FORMAT)
+    else:
+      self.timestamp_crawled = timestamp_crawled
 
   @classmethod
   def from_tweepy_user(cls, tweepy_user):
@@ -223,7 +230,7 @@ class User:
                 tweepy_user.friends_count, tweepy_user.created_at,
                 tweepy_user.listed_count, tweepy_user.verified,
                 tweepy_user.utc_offset, tweepy_user.time_zone,
-                tweepy_user.lang)
+                tweepy_user.lang, datetime.now())
 
   def __str__(self):
     """Create a pretty str representation."""
