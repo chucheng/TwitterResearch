@@ -13,13 +13,11 @@ import matplotlib
 matplotlib.use("Agg")
 from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
-import matplotlib.axis
 
 from constants import _TIMEDELTAS_FILE_URL_INDEX
 from constants import _TIMEDELTAS_FILE_USER_ID_INDEX
 from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
-from constants import _TIMEDELTAS_FILE_SOURCE_INDEX
 from constants import _HITS_MISSES_FILE_USER_ID_INDEX
 from constants import _HITS_MISSES_FILE_MISSES_INDEX
 from constants import _HITS_MISSES_FILE_HITS_INDEX
@@ -159,9 +157,6 @@ def gather_tweet_counts(hours, seeds, experts_precision, experts_fscore,
   with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
     for line in input_file:
       tokens = line.split('\t')
-      source = tokens[_TIMEDELTAS_FILE_SOURCE_INDEX].strip()
-      if source == 'twitterfeed':
-        continue
       url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
       user_id = tokens[_TIMEDELTAS_FILE_USER_ID_INDEX]
       time_delta = timedelta(seconds=int(tokens[_TIMEDELTAS_FILE_DELTA_INDEX]))

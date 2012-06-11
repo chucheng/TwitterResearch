@@ -188,7 +188,7 @@ def draw_active_users_graph(avg_num_tweets):
   axs.xaxis.set_minor_locator(MultipleLocator(5))
   axs.yaxis.set_minor_locator(MultipleLocator(5))
   plt.grid(True, which='minor')
-  plt.xlabel('percentile', fontsize='16')
+  plt.xlabel('Users Sorted by Activeness (%)', fontsize='16')
   plt.ylabel('Average Number Tweets per Month', fontsize='16')
 
   with open(_GRAPH_DIR + 'num_avg_tweets.png', 'w') as graph:

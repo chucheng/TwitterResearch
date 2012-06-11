@@ -46,7 +46,7 @@ import matplotlib.pyplot as plt
 import math
 from math import sqrt
 
-# from constants import _DELTAS
+from constants import _DELTAS
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
@@ -61,11 +61,11 @@ _CATEGORIES = []
 # Comment categories in/out individually as needed.
 _CATEGORIES.append(None)
 # _CATEGORIES.append('world')
-# _CATEGORIES.append('business')
+_CATEGORIES.append('business')
 # _CATEGORIES.append('opinion')
 _CATEGORIES.append('sports')
 # _CATEGORIES.append('us')
-# _CATEGORIES.append('technology')
+_CATEGORIES.append('technology')
 # _CATEGORIES.append('movies')
 
 
@@ -217,7 +217,7 @@ def draw_avg_diff_graph(newsaholic_diffs, market_diffs, active_diffs,
   plt.close()
 
 
-def draw_precision_graph(market_precisions, newsaholic_precisions,
+def draw_precision_graph(newsaholic_precisions,
                          active_precisions, common_precisions,
                          expert_p_precisions, expert_f_precisions,
                          expert_c_precisions, expert_s_precisions,
@@ -230,9 +230,6 @@ def draw_precision_graph(market_precisions, newsaholic_precisions,
   plots = []
   figure = plt.figure()
   axs = figure.add_subplot(111)
-
-  market_plot = axs.plot(market_precisions)
-  plots.append(market_plot)
 
   # Groups
   newsaholic_plot = axs.plot(newsaholic_precisions, '--', linewidth=2)
@@ -252,8 +249,7 @@ def draw_precision_graph(market_precisions, newsaholic_precisions,
   expert_s_plot = axs.plot(expert_s_precisions, ':', linewidth=2)
   plots.append(expert_s_plot)
 
-  labels = ['Market',
-            'News-addicted', 'Active Users', 'Common Users',
+  labels = ['News-addicted', 'Active Users', 'Common Users',
             'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)',
             'Super Experts']
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
@@ -276,8 +272,7 @@ def draw_precision_graph(market_precisions, newsaholic_precisions,
   plt.close()
 
 
-def draw_precision_recall_graph(market_precisions, market_recalls,
-                                newsaholic_precisions, newsaholic_recalls,
+def draw_precision_recall_graph(newsaholic_precisions, newsaholic_recalls,
                                 active_precisions, active_recalls,
                                 common_precisions, common_recalls,
                                 expert_p_precisions, expert_p_recalls,
@@ -298,9 +293,6 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
   plots = []
   figure = plt.figure()
   axs = figure.add_subplot(111)
-
-  market_plot = axs.plot(market_recalls, market_precisions)
-  plots.append(market_plot)
 
   # Groups
   newsaholic_plot = axs.plot(newsaholic_recalls, newsaholic_precisions, '--',
@@ -327,14 +319,12 @@ def draw_precision_recall_graph(market_precisions, market_recalls,
                            linewidth=2)
   plots.append(expert_s_plot)
 
-  labels = ['Market',
-            'News-addicted', 'Active Users', 'Common Users',
+  labels = ['News-addicted', 'Active Users', 'Common Users',
             'Experts (Precision)', 'Experts (F-score)', 'Experts (CI)',
             'Super Experts']
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
 
-  max_x = max([max(market_recalls),
-               max(newsaholic_recalls), max(active_recalls),
+  max_x = max([max(newsaholic_recalls), max(active_recalls),
                max(common_recalls), max(expert_p_recalls),
                max(expert_f_recalls), max(expert_c_recalls),
                max(expert_s_recalls)])
@@ -384,8 +374,8 @@ def run():
     target_news = ground_truths.find_target_news(gt_rankings, _SIZE_TOP_NEWS)
     log('Size target_news: %s' % len(target_news))
 
-    # for delta in _DELTAS:
-    for delta in [4, 8]:
+    for delta in _DELTAS:
+    # for delta in [4, 8]:
       run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
                                            int(_SIZE_EXPERTS * 100), category)
       info_output_dir = '../graph/FolkWisdom/%s/info/' % run_params_str
@@ -541,11 +531,6 @@ def run():
       log('Ground Truth Top 5')
       for i in range(min(len(gt_rankings), 5)):
         url, count = gt_rankings[i]
-        log('[%s] %s\t%s' %(i, url.strip(), count))
-      log('-----------------------------------')
-      log('Market Top 5')
-      for i in range(min(len(market_rankings), 5)):
-        url, count = market_rankings[i]
         log('[%s] %s\t%s' %(i, url.strip(), count))
       log('-----------------------------------')
       log('Newsaholic Top 5')
@@ -704,7 +689,7 @@ def run():
           output_file.write('%s\t%s\n' % (url.strip(), count))
       with open('%smarket_rankings_%s.tsv'
                 % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(market_rankings):
+        for rank, (url, count) in enumerate(common_rankings):
           output_file.write('%s\t%s\t(%s,%s)\n'
                             % (url.strip(), count, rank,
                                ground_truth_url_to_rank[url]))
@@ -767,7 +752,7 @@ def run():
 
       with open('../data/FolkWisdom/market_precisions_%s.txt'
                 % run_params_str, 'w') as out_file:
-        for precision in market_precisions:
+        for precision in common_precisions:
           out_file.write('%s\n' % precision)
 
       with open('../data/FolkWisdom/expert_p_precisions_%s.txt'
@@ -786,8 +771,8 @@ def run():
           out_file.write('%s\n' % precision)
 
       log('Drawing summary precision-recall graphs...')
-      draw_precision_recall_graph(market_precisions, market_recalls,
-                                  newsaholic_precisions,
+      # draw_precision_recall_graph(market_precisions, market_recalls,
+      draw_precision_recall_graph(newsaholic_precisions,
                                   newsaholic_recalls,
                                   active_precisions, active_recalls,
                                   common_precisions, common_recalls,
@@ -798,14 +783,16 @@ def run():
                                   run_params_str)
 
       log('Drawing summary precision-topnews graphs...')
-      draw_precision_graph(market_precisions, newsaholic_precisions,
+      # draw_precision_graph(market_precisions, newsaholic_precisions,
+      draw_precision_graph(newsaholic_precisions,
                            active_precisions, common_precisions,
                            expert_p_precisions, expert_f_precisions,
                            expert_c_precisions, expert_s_precisions,
                            run_params_str)
 
       log('Drawing experts precision-recall graph...')
-      experts.draw_precision_recall_experts(market_precisions, market_recalls,
+      # experts.draw_precision_recall_experts(market_precisions, market_recalls,
+      experts.draw_precision_recall_experts(common_precisions, common_recalls,
                                             expert_p_precisions,
                                             expert_p_recalls,
                                             expert_f_precisions,
@@ -815,14 +802,15 @@ def run():
                                             run_params_str)
 
       log('Drawing experts precision-topnews graph...')
-      experts.draw_precision_experts(market_precisions, expert_p_precisions,
+      # experts.draw_precision_experts(market_precisions, expert_p_precisions,
+      experts.draw_precision_experts(common_precisions, expert_p_precisions,
                                      expert_f_precisions, expert_c_precisions,
                                      run_params_str)
 
       log('Drawing basic groups precision-recall graph...')
-      basic_groups.draw_precision_recall_groups(market_precisions,
-                                                market_recalls,
-                                                newsaholic_precisions,
+      # basic_groups.draw_precision_recall_groups(market_precisions,
+      #                                           market_recalls,
+      basic_groups.draw_precision_recall_groups(newsaholic_precisions,
                                                 newsaholic_recalls,
                                                 active_precisions,
                                                 active_recalls,
@@ -831,28 +819,32 @@ def run():
                                                 run_params_str)
 
       log('Drawing basic groups precision-topnews graph...')
-      basic_groups.draw_precision_groups(market_precisions,
-                                         newsaholic_precisions,
+      # basic_groups.draw_precision_groups(market_precisions,
+      basic_groups.draw_precision_groups(newsaholic_precisions,
                                          active_precisions,
                                          common_precisions,
                                          run_params_str)
 
       log('Drawing mixed model precision-recall graph...')
-      mixed_model.draw_precision_recall_mixed(market_precisions, market_recalls,
+      # mixed_model.draw_precision_recall_mixed(market_precisions, market_recalls,
+      mixed_model.draw_precision_recall_mixed(common_precisions, common_recalls,
                                               mixed_precisions, mixed_recalls,
                                               run_params_str)
 
       log('Drawing mixed model precision-topnews graph...')
-      mixed_model.draw_precision_mixed(market_precisions, mixed_precisions,
+      # mixed_model.draw_precision_mixed(market_precisions, mixed_precisions,
+      mixed_model.draw_precision_mixed(common_precisions, mixed_precisions,
                                        run_params_str)
 
       log('Drawing even group model precision-recall graph...')
-      even_groups.draw_precision_recall(market_precisions, market_recalls,
+      # even_groups.draw_precision_recall(market_precisions, market_recalls,
+      even_groups.draw_precision_recall(common_precisions, common_recalls,
                                         groups_precisions, groups_recalls,
                                         run_params_str)
 
       log('Drawing even group model precision graph...')
-      even_groups.draw_precision(market_precisions, groups_precisions,
+      # even_groups.draw_precision(market_precisions, groups_precisions,
+      even_groups.draw_precision(common_precisions, groups_precisions,
                                  run_params_str)
 
 

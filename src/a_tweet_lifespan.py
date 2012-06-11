@@ -119,8 +119,8 @@ def draw_graph(aggregates, aggregates_top):
 
   plt.grid(True, which='major', linewidth=2)
 
-  plt.xlabel('Hours')
-  plt.ylabel('Inactive News Threads (%)')
+  plt.xlabel('Passing Hours', fontsize=16)
+  plt.ylabel('Inactive News Stories (%)', fontsize=16)
 
   with open(_GRAPH_DIR + 'tweet_lifespan.png', 'w') as graph:
     plt.savefig(graph, format='png')

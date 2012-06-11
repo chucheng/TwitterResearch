@@ -12,21 +12,19 @@ import matplotlib
 matplotlib.use("Agg")
 from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
-import matplotlib.axis
 
 from constants import _TIMEDELTAS_FILE_URL_INDEX
 from constants import _TIMEDELTAS_FILE_USER_ID_INDEX
 from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
-from constants import _TIMEDELTAS_FILE_SOURCE_INDEX
 from constants import _USER_ACTIVITY_FILE_ID_INDEX
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 
 
-def draw_precision_groups(market_precisions, newsaholic_precisions,
-                                 active_precisions, common_precisions,
-                                 run_params_str):
+def draw_precision_groups(newsaholic_precisions,
+                          active_precisions, common_precisions,
+                          run_params_str):
   """Draws the precision recall graph for all the user groups and a given delta.
 
   Plots the given list of precisions against the number of top news that the
@@ -35,9 +33,6 @@ def draw_precision_groups(market_precisions, newsaholic_precisions,
   plots = []
   figure = plt.figure()
   axs = figure.add_subplot(111)
-
-  market_plot = axs.plot(market_precisions)
-  plots.append(market_plot)
 
   newsaholic_plot = axs.plot(newsaholic_precisions, '--', linewidth=2)
   plots.append(newsaholic_plot)
@@ -49,7 +44,7 @@ def draw_precision_groups(market_precisions, newsaholic_precisions,
   plots.append(common_plot)
 
 
-  labels = ['Market', 'News-addicted', 'Active Users', 'Common Users', ]
+  labels = ['News-addicted', 'Active Users', 'Common Users', ]
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
 
   plt.grid(True, which='major', linewidth=1)
@@ -70,8 +65,7 @@ def draw_precision_groups(market_precisions, newsaholic_precisions,
   plt.close()
 
 
-def draw_precision_recall_groups(market_precisions, market_recalls,
-                                 newsaholic_precisions,
+def draw_precision_recall_groups(newsaholic_precisions,
                                  newsaholic_recalls, active_precisions,
                                  active_recalls, common_precisions,
                                  common_recalls, run_params_str):
@@ -89,9 +83,6 @@ def draw_precision_recall_groups(market_precisions, market_recalls,
   figure = plt.figure()
   axs = figure.add_subplot(111)
 
-  market_plot = axs.plot(market_recalls, market_precisions)
-  plots.append(market_plot)
-
   newsaholic_plot = axs.plot(newsaholic_recalls, newsaholic_precisions, '--',
                             linewidth=2)
   plots.append(newsaholic_plot)
@@ -105,10 +96,10 @@ def draw_precision_recall_groups(market_precisions, market_recalls,
   plots.append(common_plot)
 
 
-  labels = ['Market', 'News-addicted', 'Active Users', 'Common Users', ]
+  labels = ['News-addicted', 'Active Users', 'Common Users', ]
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
 
-  max_x = max([max(market_recalls), max(newsaholic_recalls),
+  max_x = max([max(newsaholic_recalls),
                max(active_recalls), max(common_recalls)])
   plt.axis([0, max_x + 5, 0, 105])
   plt.grid(True, which='major', linewidth=1)
@@ -156,9 +147,6 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, category=None):
   with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
     for line in input_file:
       tokens = line.split('\t')
-      source = tokens[_TIMEDELTAS_FILE_SOURCE_INDEX].strip()
-      if source == 'twitterfeed':
-        continue
       url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
       user_id = tokens[_TIMEDELTAS_FILE_USER_ID_INDEX]
       time_delta = timedelta(seconds=int(tokens[_TIMEDELTAS_FILE_DELTA_INDEX]))
