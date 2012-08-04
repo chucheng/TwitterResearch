@@ -82,7 +82,10 @@ def draw_graph(top_sorted, original_dict, retweet_dict, param_str):
     original .append(percent_original)
     retweet.append(percent_retweet)
 
+  # Cleaning.
   devices = [re.sub(r'[^a-zA-Z0-9_\s]', '', device) for device in devices]
+  # Replace web with twitter.com (web)
+  devices = [re.sub('web', 'twitter.com (web)', device) for device in devices]
 
   fig = plt.figure()
   axs = fig.add_subplot(111)
@@ -100,7 +103,7 @@ def draw_graph(top_sorted, original_dict, retweet_dict, param_str):
   axs.set_xticklabels(devices, rotation='12')
 
   axs.legend((rects1[0], rects2[0], rects3[0]),
-             ('Popular News', 'Origin Tweets', 'Retweets'))
+             ('Popular News Only', 'Tweets (No Retweets)', 'Retweets'))
 
   with open(_GRAPH_DIR + '/source_device%s.png' % param_str, 'w') as graph:
     plt.savefig(graph, format='png')
