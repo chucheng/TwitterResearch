@@ -114,8 +114,8 @@ def draw_graph(aggregates, aggregates_top):
   top_plot = axs.semilogx(_AGGREGATE_HOURS, aggregates_top, 'r--', linewidth=3)
   plots.append(top_plot)
 
-  labels = ['All News', 'Top News']
-  plt.legend(plots, labels, loc=0, ncol=1, columnspacing=0, handletextpad=0)
+  labels = ['All News', 'Top 2% in Popularity']
+  plt.legend(plots, labels, loc=4, ncol=1, columnspacing=0, handletextpad=0)
 
   plt.grid(True, which='major', linewidth=2)
 
