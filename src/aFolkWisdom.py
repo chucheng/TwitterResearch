@@ -61,11 +61,11 @@ _CATEGORIES = []
 # Comment categories in/out individually as needed.
 _CATEGORIES.append(None)
 # _CATEGORIES.append('world')
-_CATEGORIES.append('business')
+# _CATEGORIES.append('business')
 # _CATEGORIES.append('opinion')
-_CATEGORIES.append('sports')
+# _CATEGORIES.append('sports')
 # _CATEGORIES.append('us')
-_CATEGORIES.append('technology')
+# _CATEGORIES.append('technology')
 # _CATEGORIES.append('movies')
 
 
@@ -374,8 +374,8 @@ def run():
     target_news = ground_truths.find_target_news(gt_rankings, _SIZE_TOP_NEWS)
     log('Size target_news: %s' % len(target_news))
 
-    for delta in _DELTAS:
-    # for delta in [4, 8]:
+    # for delta in _DELTAS:
+    for delta in [4]:
       run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
                                            int(_SIZE_EXPERTS * 100), category)
       info_output_dir = '../graph/FolkWisdom/%s/info/' % run_params_str
