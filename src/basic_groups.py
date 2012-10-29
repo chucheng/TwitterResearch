@@ -18,8 +18,10 @@ from constants import _TIMEDELTAS_FILE_USER_ID_INDEX
 from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
 from constants import _USER_ACTIVITY_FILE_ID_INDEX
+from params import _SWITCHED
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
+_IN_DIR = '../data/FolkWisdom/'
 
 
 def draw_precision_groups(newsaholic_precisions,
@@ -121,7 +123,52 @@ def draw_precision_recall_groups(newsaholic_precisions,
   plt.close()
 
 
-def gather_tweet_counts(hours, seeds, newsaholics, active, category=None):
+def draw_crowd_definition(population_precisions, population_recalls,
+                          nonexpert_precisions, nonexpert_recalls,
+                          common_precisions, common_recalls, run_params_str):
+  plots = []
+  figure = plt.figure()
+  axs = figure.add_subplot(111)
+
+  population_plot = axs.plot(population_recalls, population_precisions, '--',
+                             linewidth=2)
+  plots.append(population_plot)
+
+  nonexpert_plot = axs.plot(nonexpert_recalls, nonexpert_precisions, '--',
+                             linewidth=2)
+  plots.append(nonexpert_plot)
+
+  common_plot = axs.plot(common_recalls, common_precisions, '-.',
+                        linewidth=2)
+  plots.append(common_plot)
+
+  labels = ['Population', 'Non-experts', 'Common Users', ]
+  plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
+
+  max_x = max([max(population_recalls), max(nonexpert_recalls),
+               max(common_recalls)])
+  plt.axis([0, max_x + 5, 0, 105])
+  plt.grid(True, which='major', linewidth=1)
+
+  axs.xaxis.set_minor_locator(MultipleLocator(5))
+  axs.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Recall (%)', fontsize='16')
+  plt.ylabel('Precision (%)', fontsize='16')
+
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_crowd_def_%s.png'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_crowd_def_%s.eps'
+            % run_params_str, 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  plt.close()
+
+
+def gather_tweet_counts(hours, seeds, newsaholics, active, all_experts,
+                        category=None):
   """Gathers the tweet counts for a given set of months.
   
   Only counts votes if they occur within the given time delta from the seed
@@ -144,7 +191,8 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, category=None):
   newsaholic_tweet_counts = {}
   active_tweet_counts = {}
   common_tweet_counts = {}
-  with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
+  nonexpert_tweet_counts = {}
+  with open(_IN_DIR + 'time_deltas.tsv') as input_file:
     for line in input_file:
       tokens = line.split('\t')
       url = tokens[_TIMEDELTAS_FILE_URL_INDEX]
@@ -156,7 +204,10 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, category=None):
 
       if url in seeds:
         (seed_tweet_id, seed_user_id, seed_time) = seeds[url]
-        if Util.is_in_testing_set(seed_time):
+        in_correct_set = Util.is_in_testing_set(seed_time)
+        if _SWITCHED:
+          in_correct_set = Util.is_in_training_set(seed_time)
+        if in_correct_set:
 
           if time_delta < max_delta:
 
@@ -174,6 +225,13 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, category=None):
                 market_tweet_counts[url] += 1
               else:
                 market_tweet_counts[url] = 1
+
+              # Market - experts
+              if user_id not in all_experts:
+                if url in nonexpert_tweet_counts:
+                  nonexpert_tweet_counts[url] += 1
+                else:
+                  nonexpert_tweet_counts[url] = 1
 
               # Other groups
               if user_id in newsaholics:
@@ -194,10 +252,11 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, category=None):
               
                 
   return (market_tweet_counts, newsaholic_tweet_counts, active_tweet_counts,
-          common_tweet_counts)
+          common_tweet_counts, nonexpert_tweet_counts)
 
 
-def get_rankings(delta, seeds, newsaholics, active_users, category=None):
+def get_rankings(delta, seeds, newsaholics, active_users, all_experts,
+                 category=None):
   """Gets the true rankings, and ranking as determined by various user groups.
   
   Keyword Arguments:
@@ -213,13 +272,16 @@ def get_rankings(delta, seeds, newsaholics, active_users, category=None):
   market, newsaholics, active users, common userse, experts (precision,
   f-score, confidence interval, super).
   """
-  mtc, etc, atc, ctc  = gather_tweet_counts(delta, seeds, newsaholics,
-                                            active_users,category)
+  mtc, etc, atc, ctc, netc  = gather_tweet_counts(delta, seeds, newsaholics,
+                                                  active_users, all_experts,
+                                                  category)
   market_rankings = sorted(mtc.items(), key=lambda x: x[1], reverse=True)
   newsaholic_rankings = sorted(etc.items(), key=lambda x: x[1], reverse=True)
   active_rankings = sorted(atc.items(), key=lambda x: x[1], reverse=True)
   common_rankings = sorted(ctc.items(), key=lambda x: x[1], reverse=True)
-  return market_rankings, newsaholic_rankings, active_rankings, common_rankings
+  nonexpert_rankings = sorted(netc.items(), key=lambda x: x[1], reverse=True)
+  return (market_rankings, newsaholic_rankings, active_rankings,
+          common_rankings, nonexpert_rankings)
 
 
 def group_users(delta, category=None):
@@ -234,8 +296,11 @@ def group_users(delta, category=None):
   common_users -- A python set of user ids for common users, defined as users
   whose rank is lower the 25% as ranked by activity.
   """
+  in_dir = _IN_DIR
   user_ids_sorted = []
-  input_file = '../data/FolkWisdom/user_activity_%s_%s.tsv' % (delta, category)
+  if _SWITCHED:
+    in_dir += 'switched/'
+  input_file = in_dir + 'user_activity_%s_%s.tsv' % (delta, category)
   with open(input_file) as input_file:
     for line in input_file:
       tokens = line.split('\t')

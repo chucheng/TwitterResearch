@@ -46,20 +46,27 @@ import matplotlib.pyplot as plt
 import math
 from math import sqrt
 
-from constants import _DELTAS
+# from constants import _DELTAS
+from params import _DELTAS
+from params import _CATEGORIES
+from params import _SIZE_EXPERTS
+from params import _SIZE_TOP_NEWS
+from params import _NUM_GROUPS
+from params import _SIZE_OF_GROUP_IN_PERCENT
+from params import _SWITCHED
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
 
-_SIZE_EXPERTS = .02
-_SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
+# _SIZE_EXPERTS = .02
+# _SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
 
-_NUM_GROUPS = 5
-_SIZE_OF_GROUP_IN_PERCENT = .02
+# _NUM_GROUPS = 5
+# _SIZE_OF_GROUP_IN_PERCENT = .02
 
-_CATEGORIES = []
+# _CATEGORIES = []
 # Comment categories in/out individually as needed.
-_CATEGORIES.append(None)
+# _CATEGORIES.append(None)
 # _CATEGORIES.append('world')
 # _CATEGORIES.append('business')
 # _CATEGORIES.append('opinion')
@@ -361,8 +368,10 @@ def run():
     else:
       _SIZE_TOP_NEWS = .02
 
-    gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TESTING,
-                                                category)
+    data_set = DataSet.TESTING
+    if _SWITCHED:
+      data_set = DataSet.TRAINING
+    gt_rankings = ground_truths.get_gt_rankings(seeds, data_set, category)
     log('Num ground_truth_rankings: %s' % len(gt_rankings))
 
     # Format for use later.
@@ -374,8 +383,8 @@ def run():
     target_news = ground_truths.find_target_news(gt_rankings, _SIZE_TOP_NEWS)
     log('Size target_news: %s' % len(target_news))
 
-    # for delta in _DELTAS:
-    for delta in [4]:
+    for delta in _DELTAS:
+    # for delta in [4]:
       run_params_str = 'd%s_t%s_e%s_%s' % (delta, int(_SIZE_TOP_NEWS * 100),
                                            int(_SIZE_EXPERTS * 100), category)
       info_output_dir = '../graph/FolkWisdom/%s/info/' % run_params_str
@@ -383,9 +392,11 @@ def run():
 
       (num_users, newsaholics,
        active_users, common_users) = basic_groups.group_users(delta, category)
+      population = newsaholics.union(active_users).union(common_users)
       log('Num newsaholics: %s' % len(newsaholics))
       log('Num active: %s' % len(active_users))
       log('Num common: %s' % len(common_users))
+      log('Num users (population): %s' % len(population))
 
       num_users_eg, groups = even_groups.group_users(delta,
                                                      _NUM_GROUPS,
@@ -405,24 +416,36 @@ def run():
       super_experts = experts.select_super_experts(experts_precision,
                                                    experts_fscore,
                                                    experts_ci)
+      all_experts = experts.select_all_experts(experts_precision,
+                                               experts_fscore,
+                                               experts_ci)
+      social_bias_experts = experts.select_experts_social_bias(num_users,
+                                                               _SIZE_EXPERTS)
 
       log('Num experts (precision): %s' % len(experts_precision))
       log('Num experts (fscore): %s' % len(experts_fscore))
       log('Num experts (ci): %s' % len(experts_ci))
       log('Num Super Experts: %s' %len(super_experts))
+      log('Num Social Bias Experts: %s' % len(social_bias_experts))
 
       log('Finding rankings with an %s hour delta.' % delta)
       (market_rankings, newsaholic_rankings,
        active_rankings,
-       common_rankings) = basic_groups.get_rankings(delta, seeds, newsaholics,
-                                                    active_users, category)
+       common_rankings,
+       nonexpert_rankings) = basic_groups.get_rankings(delta, seeds,
+                                                       newsaholics,
+                                                       active_users,
+                                                       all_experts,
+                                                       category)
       (expert_precision_rankings, expert_fscore_rankings,
        expert_ci_rankings,
-       expert_s_rankings) = experts.get_rankings(delta, seeds,
+       expert_s_rankings,
+       expert_sb_rankings) = experts.get_rankings(delta, seeds,
                                                  experts_precision,
                                                  experts_fscore,
                                                  experts_ci,
                                                  super_experts,
+                                                 social_bias_experts,
                                                  category)
 
       groups_rankings = even_groups.get_rankings(delta, seeds, groups,
@@ -449,6 +472,11 @@ def run():
         num_votes_common += count
       log('Num common_rankings: %s' % len(common_rankings))
       log('Num common votes: %s' % num_votes_common)
+      num_votes_nonexpert = 0
+      for url, count in nonexpert_rankings:
+        num_votes_nonexpert += count
+      log('Num nonexpert_rankings: %s' % len(nonexpert_rankings))
+      log('Num nonexpert votes: %s' % num_votes_nonexpert)
       num_votes_expert_precision = 0
       for url, count in expert_precision_rankings:
         num_votes_expert_precision += count
@@ -469,6 +497,11 @@ def run():
         num_votes_expert_s += count
       log('Num expert_s rankings: %s' % len(expert_s_rankings))
       log('Num expert_s votes: %s' % num_votes_expert_s)
+      num_votes_expert_sb = 0
+      for url, count in expert_sb_rankings:
+        num_votes_expert_sb += count
+      log('Num expert_sb rankings: %s' % len(expert_sb_rankings))
+      log('Num expert_sb votes: %s' % num_votes_expert_sb)
 
       for group_rankings in groups_rankings:
         num_votes_group = 0
@@ -491,6 +524,8 @@ def run():
         output_file.write('Number of Precision Experts: %s\n' % len(experts_precision))
         output_file.write('Number of F-Score Experts: %s\n' % len(experts_fscore))
         output_file.write('Number of CI Experts: %s\n' % len(experts_ci))
+        output_file.write('Number of Social Bias Experts: %s\n' % len(social_bias_experts))
+        output_file.write('Total number of unique experts: %s\n' % len(all_experts))
         output_file.write('Number of Precision and F-Score Experts: %s\n'
                           % len(experts_precision.intersection(experts_fscore)))
         output_file.write('Number of Precision and CI Experts: %s\n'
@@ -521,6 +556,8 @@ def run():
                 % num_votes_expert_ci) 
         output_file.write('Number of votes by Super Experts: %s\n'
                           % num_votes_expert_s)
+        output_file.write('Number of votes by Social Bias Experts: %s\n'
+                          % num_votes_expert_sb)
         output_file.write('\n')
         output_file.write('Total Number of votes cast: %s\n'
                           % (num_votes_newsaholics + num_votes_active
@@ -548,6 +585,11 @@ def run():
         url, count = common_rankings[i]
         log('[%s] %s\t%s' %(i, url.strip(), count))
       log('-----------------------------------')
+      log('nonexpert Top 5')
+      for i in range(min(len(nonexpert_rankings), 5)):
+        url, count = nonexpert_rankings[i]
+        log('[%s] %s\t%s' %(i, url.strip(), count))
+      log('-----------------------------------')
       log('Expert (Precision) Top 5')
       for i in range(min(len(expert_precision_rankings), 5)):
         url, count = expert_precision_rankings[i]
@@ -566,6 +608,11 @@ def run():
       log('Super Expert Top 5')
       for i in range(min(len(expert_s_rankings), 5)):
         url, count = expert_s_rankings[i]
+        log('[%s] %s\t%s' %(i, url.strip(), count))
+      log('-----------------------------------')
+      log('Social Bias Expert Top 5')
+      for i in range(min(len(expert_sb_rankings), 5)):
+        url, count = expert_sb_rankings[i]
         log('[%s] %s\t%s' %(i, url.strip(), count))
 
       for group_rankings in groups_rankings:
@@ -620,6 +667,8 @@ def run():
                                                                 active_rankings)
       common_precisions, common_recalls = calc_precision_recall(gt_rankings,
                                                                 common_rankings)
+      nonexpert_precisions, nonexpert_recalls = calc_precision_recall(gt_rankings,
+                                                                      nonexpert_rankings)
       (expert_p_precisions,
        expert_p_recalls) = calc_precision_recall(gt_rankings,
                                                  expert_precision_rankings)
@@ -632,6 +681,9 @@ def run():
       (expert_s_precisions,
        expert_s_recalls) = calc_precision_recall(gt_rankings,
                                                  expert_s_rankings)
+      (expert_sb_precisions,
+       expert_sb_recalls) = calc_precision_recall(gt_rankings,
+                                                  expert_sb_rankings)
 
       mixed_rankings = mixed_model.get_mixed_rankings(market_url_to_rank,
                                                       market_precisions,
@@ -711,6 +763,12 @@ def run():
           output_file.write('%s\t%s\t(%s,%s)\n'
                             % (url.strip(), count, rank,
                                ground_truth_url_to_rank[url]))
+      with open('%snonexpert_user_rankings_%s.tsv'
+                % (info_output_dir, run_params_str), 'w') as output_file:
+        for rank, (url, count) in enumerate(nonexpert_rankings):
+          output_file.write('%s\t%s\t(%s,%s)\n'
+                            % (url.strip(), count, rank,
+                               ground_truth_url_to_rank[url]))
       with open('%sexpert_p_user_rankings_%s.tsv'
                 % (info_output_dir, run_params_str), 'w') as output_file:
         for rank, (url, count) in enumerate(expert_precision_rankings):
@@ -735,6 +793,12 @@ def run():
           output_file.write('%s\t%s\t(%s,%s)\n'
                             % (url.strip(), count, rank,
                             ground_truth_url_to_rank[url]))
+      with open('%sexpert_sb_user_rankings_%s.tsv'
+                % (info_output_dir, run_params_str), 'w') as output_file:
+        for rank, (url, count) in enumerate(expert_sb_rankings):
+          output_file.write('%s\t%s\t(%s,%s)\n'
+                            % (url.strip(), count, rank,
+                            ground_truth_url_to_rank[url]))
       with open('%smixed_rankings_%s.tsv'
                 % (info_output_dir, run_params_str), 'w') as output_file:
         for rank, (url, count) in enumerate(mixed_rankings):
@@ -753,6 +817,11 @@ def run():
       with open('../data/FolkWisdom/market_precisions_%s.txt'
                 % run_params_str, 'w') as out_file:
         for precision in common_precisions:
+          out_file.write('%s\n' % precision)
+
+      with open('../data/FolkWisdom/nonexpert_precisions_%s.txt'
+                % run_params_str, 'w') as out_file:
+        for precision in nonexpert_precisions:
           out_file.write('%s\n' % precision)
 
       with open('../data/FolkWisdom/expert_p_precisions_%s.txt'
@@ -807,6 +876,18 @@ def run():
                                      expert_f_precisions, expert_c_precisions,
                                      run_params_str)
 
+      experts.draw_precision_recall_social_bias(common_precisions,
+                                                common_recalls,
+                                                expert_sb_precisions,
+                                                expert_sb_recalls,
+                                                expert_p_precisions,
+                                                expert_p_recalls,
+                                                expert_f_precisions,
+                                                expert_f_recalls,
+                                                expert_c_precisions,
+                                                expert_c_recalls,
+                                                run_params_str)
+
       log('Drawing basic groups precision-recall graph...')
       # basic_groups.draw_precision_recall_groups(market_precisions,
       #                                           market_recalls,
@@ -823,6 +904,12 @@ def run():
       basic_groups.draw_precision_groups(newsaholic_precisions,
                                          active_precisions,
                                          common_precisions,
+                                         run_params_str)
+
+      log('Drawing crowd def precision-recall graph...')
+      basic_groups.draw_crowd_definition(market_precisions, market_recalls,
+                                         nonexpert_precisions, nonexpert_recalls,
+                                         common_precisions, common_recalls,
                                          run_params_str)
 
       log('Drawing mixed model precision-recall graph...')

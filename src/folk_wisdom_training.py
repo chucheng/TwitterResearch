@@ -20,17 +20,20 @@ from constants import _TWEETFILE_TWEET_TEXT_INDEX
 from constants import _DATETIME_FORMAT
 from constants import _DELTAS
 from constants import _TRAINING_SET_MONTHS
+from constants import _TESTING_SET_MONTHS
+from params import _SWITCHED
 
 _LOG_FILE = 'folk_wisdom_training.log'
+_OUT_DIR = '../data/FolkWisdom/'
 
 _CATEGORIES = []
-# _CATEGORIES.append(None)
-_CATEGORIES.append('world')
+_CATEGORIES.append(None)
+# _CATEGORIES.append('world')
 # _CATEGORIES.append('business')
 # _CATEGORIES.append('opinion')
-_CATEGORIES.append('sports')
+# _CATEGORIES.append('sports')
 # _CATEGORIES.append('us')
-_CATEGORIES.append('technology')
+# _CATEGORIES.append('technology')
 # _CATEGORIES.append('movies')
 
 
@@ -84,7 +87,7 @@ def find_hits_and_mises(months, target_news, seeds, cache, delta,
                   else:
                     hits_and_misses[user_id] = (0, 1)
 
-  output_file = ('../data/FolkWisdom/user_hits_and_misses_%s_%s.tsv'
+  output_file = (_OUT_DIR + 'user_hits_and_misses_%s_%s.tsv'
                  % (delta, category))
   with open(output_file, 'w') as out_file:
     for user_id, (hits, misses) in hits_and_misses.items():
@@ -139,7 +142,7 @@ def sort_users_by_tweet_count(months, seeds, cache, delta, category=None):
   log("Size of users for category %s (total): %s"
       % (str(len(user_id_to_tweet_count.keys())), category))
 
-  output_file = '../data/FolkWisdom/user_activity_%s_%s.tsv' % (delta, category)
+  output_file = _OUT_DIR + 'user_activity_%s_%s.tsv' % (delta, category)
   with open(output_file, 'w') as out_file:
     for user_id, count in user_ids_sorted_by_tweet_count:
       out_file.write('%s\t%s\n' % (user_id, count))
@@ -148,18 +151,33 @@ def sort_users_by_tweet_count(months, seeds, cache, delta, category=None):
 
 def run():
   """Main logic. Outputs data in format for further analysis."""
+  global _OUT_DIR
   cache = Util.load_cache()
   seeds = Util.load_seeds()
+  if _SWITCHED:
+    _OUT_DIR += 'switched/'
+  Util.ensure_dir_exist(_OUT_DIR)
+  log('Output dir: %s' % _OUT_DIR)
+
 
   for delta in _DELTAS:
     for category in _CATEGORIES:
-      gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TRAINING,
-                                                  category)
-      sort_users_by_tweet_count(_TRAINING_SET_MONTHS, seeds, cache,
-                                delta, category)
-      target_news = ground_truths.find_target_news(gt_rankings, .02)
-      find_hits_and_mises(_TRAINING_SET_MONTHS, target_news, seeds, cache,
-                          delta, category)
+      if _SWITCHED:
+        gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TESTING,
+                                                    category)
+        sort_users_by_tweet_count(_TESTING_SET_MONTHS, seeds, cache,
+                                  delta, category)
+        target_news = ground_truths.find_target_news(gt_rankings, .02)
+        find_hits_and_mises(_TESTING_SET_MONTHS, target_news, seeds, cache,
+                            delta, category)
+      else:
+        gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TRAINING,
+                                                    category)
+        sort_users_by_tweet_count(_TRAINING_SET_MONTHS, seeds, cache,
+                                  delta, category)
+        target_news = ground_truths.find_target_news(gt_rankings, .02)
+        find_hits_and_mises(_TRAINING_SET_MONTHS, target_news, seeds, cache,
+                            delta, category)
 
   log('Finished outputting data!')
 

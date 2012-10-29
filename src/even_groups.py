@@ -13,8 +13,10 @@ from constants import _TIMEDELTAS_FILE_USER_ID_INDEX
 from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
 from constants import _USER_ACTIVITY_FILE_ID_INDEX
+from params import _SWITCHED
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
+_IN_DIR = '../data/FolkWisdom/'
 
 
 def draw_precision(market_precisions, groups_precisions,
@@ -140,7 +142,10 @@ def gather_tweet_counts(hours, seeds, groups, category=None):
 
       if url in seeds:
         (seed_tweet_id, seed_user_id, seed_time) = seeds[url]
-        if Util.is_in_testing_set(seed_time):
+        in_correct_set = Util.is_in_testing_set(seed_time)
+        if _SWITCHED:
+          in_correct_set = Util.is_in_training_set(seed_time)
+        if in_correct_set:
 
           if time_delta < max_delta:
 
@@ -202,7 +207,10 @@ def group_users(delta, num_groups, group_size_in_percent, category=None):
   groups -- A List of Sets of group ids, one for each group.
   """
   user_ids_sorted = []
-  input_file = '../data/FolkWisdom/user_activity_%s_%s.tsv' % (delta, category)
+  in_dir = _IN_DIR
+  if _SWITCHED:
+    in_dir += 'switched/'
+  input_file = in_dir + 'user_activity_%s_%s.tsv' % (delta, category)
   with open(input_file) as input_file:
     for line in input_file:
       tokens = line.split('\t')

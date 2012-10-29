@@ -17,6 +17,7 @@ from constants import _TIMEDELTAS_FILE_URL_INDEX
 from constants import _TIMEDELTAS_FILE_USER_ID_INDEX
 from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
+from params import _SWITCHED
 
 _GRAPH_DIR = Util.get_graph_output_dir('CrowdWisdomDef/')
 
@@ -172,7 +173,10 @@ def gather_tweet_counts(hours, seeds, group, category=None):
 
       if url in seeds:
         (seed_tweet_id, seed_user_id, seed_time) = seeds[url]
-        if Util.is_in_testing_set(seed_time):
+        in_correct_set = Util.is_in_testing_set(seed_time)
+        if _SWITCHED:
+          in_correct_set = Util.is_in_training_set(seed_time)
+        if in_correct_set:
 
           if time_delta < max_delta:
 

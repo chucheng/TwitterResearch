@@ -69,15 +69,29 @@ def draw_precision_recall_mixed(market_precisions, market_recalls,
   figure = plt.figure()
   axs = figure.add_subplot(111)
 
-  market_plot = axs.plot(market_recalls, market_precisions, '--')
+  market_plot = axs.plot(market_recalls, market_precisions, label='Crowd')
   plots.append(market_plot)
+
+  mixed_recalls_m = []
+  mixed_precisions_m = []
+  for (i, (precision, recall)) in enumerate(zip(mixed_precisions,
+                                                mixed_recalls)):
+    if i % 40 == 0:
+      mixed_precisions_m.append(precision)
+      mixed_recalls_m.append(recall)
 
   mixed_plot = axs.plot(mixed_recalls, mixed_precisions)
   plots.append(mixed_plot)
 
+  mixed_plot_m = axs.plot(mixed_recalls_m, mixed_precisions_m, 'go')
+  plots.append(mixed_plot_m)
+
+  p = axs.plot([0], [0], '-go', label='Mixed')
+  plots.append(p)
 
   labels = ['Market', 'Mixed (Min)', ]
-  plt.legend(plots, labels, loc=0)
+  # plt.legend(plots, labels, loc=0)
+  plt.legend(loc=3)
 
   max_x = max([max(market_recalls), max(mixed_recalls), ])
   plt.axis([0, max_x + 5, 0, 105])
@@ -96,6 +110,15 @@ def draw_precision_recall_mixed(market_precisions, market_recalls,
   with open(_GRAPH_DIR + run_params_str + '/precision_recall_mixed_%s.eps'
             % run_params_str, 'w') as graph:
     plt.savefig(graph, format='eps')
+  with open(_GRAPH_DIR + run_params_str + '/precision_recall_mixed_%s.tsv'
+            % run_params_str, 'w') as out_file:
+    for i in range(len(market_recalls)):
+      market_r = market_recalls[i]
+      market_p = market_precisions[i]
+      mixed_r = mixed_recalls[i]
+      mixed_p = mixed_precisions[i]
+      out_file.write('%s\t%s\t%s\t%s\t%s\n' % (i + 1, market_r, market_p,
+                                               mixed_r, mixed_p))
 
   plt.close()
 
