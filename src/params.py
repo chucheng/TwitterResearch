@@ -21,6 +21,7 @@ _SIZE_EXPERTS = .02
 _SIZE_TOP_NEWS = .02
 _NUM_GROUPS = 5
 _SIZE_OF_GROUP_IN_PERCENT = .02
+_NON_EXPERTS_SAMPLE_SIZE = .33
 
 # Toggle for switching training and testing sets.
-_SWITCHED = True
+_SWITCHED = False

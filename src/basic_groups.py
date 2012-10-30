@@ -125,7 +125,9 @@ def draw_precision_recall_groups(newsaholic_precisions,
 
 def draw_crowd_definition(population_precisions, population_recalls,
                           nonexpert_precisions, nonexpert_recalls,
-                          common_precisions, common_recalls, run_params_str):
+                          common_precisions, common_recalls,
+                          nonexpert_sample_precisions, nonexpert_sample_recalls,
+                          run_params_str):
   plots = []
   figure = plt.figure()
   axs = figure.add_subplot(111)
@@ -142,11 +144,17 @@ def draw_crowd_definition(population_precisions, population_recalls,
                         linewidth=2)
   plots.append(common_plot)
 
-  labels = ['Population', 'Non-experts', 'Common Users', ]
+  nonexpert_sample_plot = axs.plot(nonexpert_sample_recalls,
+                                   nonexpert_sample_precisions, '--',
+                                   linewidth=2)
+  plots.append(nonexpert_sample_plot)
+
+  labels = ['Population', 'Non-experts', 'Common Users',
+            'Non-experts (Sample)', ]
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
 
   max_x = max([max(population_recalls), max(nonexpert_recalls),
-               max(common_recalls)])
+               max(common_recalls), max(nonexpert_sample_recalls)])
   plt.axis([0, max_x + 5, 0, 105])
   plt.grid(True, which='major', linewidth=1)
 
@@ -167,8 +175,8 @@ def draw_crowd_definition(population_precisions, population_recalls,
   plt.close()
 
 
-def gather_tweet_counts(hours, seeds, newsaholics, active, all_experts,
-                        category=None):
+def gather_tweet_counts(hours, seeds, newsaholics, active, nonexperts_sampled,
+                        all_experts, category=None):
   """Gathers the tweet counts for a given set of months.
   
   Only counts votes if they occur within the given time delta from the seed
@@ -192,6 +200,7 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, all_experts,
   active_tweet_counts = {}
   common_tweet_counts = {}
   nonexpert_tweet_counts = {}
+  nonexpert_sampled_tweet_counts = {}
   with open(_IN_DIR + 'time_deltas.tsv') as input_file:
     for line in input_file:
       tokens = line.split('\t')
@@ -233,6 +242,12 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, all_experts,
                 else:
                   nonexpert_tweet_counts[url] = 1
 
+              if user_id in nonexperts_sampled:
+                if url in nonexpert_sampled_tweet_counts:
+                  nonexpert_sampled_tweet_counts[url] += 1
+                else:
+                  nonexpert_sampled_tweet_counts[url] = 1
+
               # Other groups
               if user_id in newsaholics:
                 if url in newsaholic_tweet_counts:
@@ -252,11 +267,12 @@ def gather_tweet_counts(hours, seeds, newsaholics, active, all_experts,
               
                 
   return (market_tweet_counts, newsaholic_tweet_counts, active_tweet_counts,
-          common_tweet_counts, nonexpert_tweet_counts)
+          common_tweet_counts, nonexpert_tweet_counts,
+          nonexpert_sampled_tweet_counts)
 
 
-def get_rankings(delta, seeds, newsaholics, active_users, all_experts,
-                 category=None):
+def get_rankings(delta, seeds, newsaholics, active_users, non_experts_sampled,
+                 all_experts, category=None):
   """Gets the true rankings, and ranking as determined by various user groups.
   
   Keyword Arguments:
@@ -272,16 +288,21 @@ def get_rankings(delta, seeds, newsaholics, active_users, all_experts,
   market, newsaholics, active users, common userse, experts (precision,
   f-score, confidence interval, super).
   """
-  mtc, etc, atc, ctc, netc  = gather_tweet_counts(delta, seeds, newsaholics,
-                                                  active_users, all_experts,
-                                                  category)
+  mtc, etc, atc, ctc, netc, nestc  = gather_tweet_counts(delta, seeds,
+                                                         newsaholics,
+                                                         active_users,
+                                                         non_experts_sampled,
+                                                         all_experts,
+                                                         category)
   market_rankings = sorted(mtc.items(), key=lambda x: x[1], reverse=True)
   newsaholic_rankings = sorted(etc.items(), key=lambda x: x[1], reverse=True)
   active_rankings = sorted(atc.items(), key=lambda x: x[1], reverse=True)
   common_rankings = sorted(ctc.items(), key=lambda x: x[1], reverse=True)
   nonexpert_rankings = sorted(netc.items(), key=lambda x: x[1], reverse=True)
+  nonexpert_sampled_rankings = sorted(nestc.items(), key=lambda x: x[1],
+                                      reverse=True)
   return (market_rankings, newsaholic_rankings, active_rankings,
-          common_rankings, nonexpert_rankings)
+          common_rankings, nonexpert_rankings, nonexpert_sampled_rankings)
 
 
 def group_users(delta, category=None):
