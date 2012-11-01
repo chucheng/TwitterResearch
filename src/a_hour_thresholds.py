@@ -1,3 +1,4 @@
+import sys
 import FileLog
 import experts
 import basic_groups
@@ -10,17 +11,43 @@ from constants import _TIMEDELTAS_FILE_URL_INDEX
 from constants import _TIMEDELTAS_FILE_USER_ID_INDEX
 
 _NUM_SEC_PER_HOUR = 3600
-_LOG_FILE = 'a_hour_thresholds.py'
+_LOG_FILE = 'a_hour_thresholds_chucheng.py'
 _BREAKDOWN = False
 _SIZE_EXPERTS = .02
 _SIZE_TOP_NEWS = .02
 
+# enum Expert type
+class ExpertGroup:
+  precision = None
+  fscore = None
+  ci = None
+  union = None
+
+class GroupCount:
+  population = 0
+  common = 0
+  union = 0
+  other = 0
+
+  precision = 0
+  fscore = 0
+  ci = 0
+
+  def add(self, gc):
+    self.population += gc.population
+    self.common += gc.common
+    self.union += gc.union
+    self.other += gc.other
+    self.precision += gc.precision
+    self.fscore += gc.fscore
+    self.ci += gc.ci
 
 def run():
 
   category = None
   delta = 4
-  seeds = Util.load_seeds()
+  seeds = Util.load_seeds() #read twitter data
+
   gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TESTING,
                                               category)
   log('Num ground_truth_rankings: %s' % len(gt_rankings))
@@ -34,30 +61,32 @@ def run():
   log('Num active: %s' % len(active_users))
   log('Num common: %s' % len(common_users))
   log('Num users (population): %s' % len(population))
-  experts_precision = experts.select_experts_precision(
+
+  # -- Get experts --
+  ExpertGroup.precision = experts.select_experts_precision(
       newsaholics.union(active_users), num_users, delta, _SIZE_EXPERTS,
       category)
-  experts_fscore = experts.select_experts_fscore(len(target_news),
+  ExpertGroup.fscore = experts.select_experts_fscore(len(target_news),
                                                  num_users,
                                                  delta, _SIZE_EXPERTS,
                                                  category)
-  experts_ci = experts.select_experts_ci(num_users, delta, _SIZE_EXPERTS,
+  ExpertGroup.ci = experts.select_experts_ci(num_users, delta, _SIZE_EXPERTS,
                                          category)
-  all_experts = experts.select_all_experts(experts_precision,
-                                           experts_fscore,
-                                           experts_ci)
-  log('Num experts (precision): %s' % len(experts_precision))
-  log('Num experts (fscore): %s' % len(experts_fscore))
-  log('Num experts (ci): %s' % len(experts_ci))
-  log('Num all experts: %s' % len(all_experts))
+  ExpertGroup.union = experts.select_all_experts(ExpertGroup.precision,
+                                           ExpertGroup.fscore,
+                                           ExpertGroup.ci)
+
+  log('Num experts (precision): %s' % len(ExpertGroup.precision))
+  log('Num experts (fscore): %s' % len(ExpertGroup.fscore))
+  log('Num experts (ci): %s' % len(ExpertGroup.ci))
+  log('Num all experts: %s' % len(ExpertGroup.union))
 
   # other_users = population.difference(all_experts).difference(common_users)
 
 
-  total_num_tweets = 0
-  total_num_tweets_experts = 0
-  total_num_tweets_common = 0
-  total_num_tweets_other = 0
+  # -- counting --
+
+  total_num_tweets = 0 
   hour_to_num_tweets = {}
   with open('../data/FolkWisdom/time_deltas.tsv') as in_file:
     for line in in_file:
@@ -65,43 +94,47 @@ def run():
       time_delta_in_sec = int(tokens[_TIMEDELTAS_FILE_DELTA_INDEX])
       url = tokens[_TIMEDELTAS_FILE_URL_INDEX].strip()
       user_id = tokens[_TIMEDELTAS_FILE_USER_ID_INDEX]
+
       if time_delta_in_sec > 0 and url in target_news:
         current_hour = time_delta_in_sec / _NUM_SEC_PER_HOUR
         total_num_tweets += 1
-        if current_hour in hour_to_num_tweets:
-          (num_tweets,
-           num_tweets_experts,
-           num_tweets_common,
-           num_tweets_other) = hour_to_num_tweets[current_hour]
-          num_tweets += 1
-          if user_id in all_experts:
-            num_tweets_experts += 1
-            total_num_tweets_experts += 1
-          elif user_id in common_users:
-            num_tweets_common += 1
-            total_num_tweets_common += 1
-          else:
-            num_tweets_other += 1
-            total_num_tweets_other += 1
-          hour_to_num_tweets[current_hour] = (num_tweets, num_tweets_experts,
-                                              num_tweets_common,
-                                              num_tweets_other)
-        else:
-          hour_to_num_tweets[current_hour] = (total_num_tweets,
-                                              total_num_tweets_experts,
-                                              total_num_tweets_common,
-                                              total_num_tweets_other)
-  
-  for hour in hour_to_num_tweets.keys():
-    (num_tweets, num_tweets_experts,
-     num_tweets_common, num_tweets_other) = hour_to_num_tweets[hour]
-    percentage = (num_tweets / float(total_num_tweets)) * 100.0
-    percentage_experts = (num_tweets_experts / float(total_num_tweets)) * 100.0
-    percentage_common = (num_tweets_common / float(total_num_tweets)) * 100.0
-    percentage_other = (num_tweets_other / float(total_num_tweets)) * 100.0
-    log('%s: %s\t%s\t%s\t%s' % (hour, percentage, percentage_experts,
-                                percentage_common, percentage_other))
 
+        if current_hour not in hour_to_num_tweets:
+          hour_to_num_tweets[current_hour] = GroupCount()
+        gcount = hour_to_num_tweets[current_hour]
+
+        gcount.population += 1
+        if user_id in ExpertGroup.union:
+          gcount.union += 1
+          if user_id in ExpertGroup.precision:
+            gcount.precision += 1
+          if user_id in ExpertGroup.fscore:
+            gcount.fscore += 1
+          if user_id in ExpertGroup.ci:
+            gcount.ci += 1
+          
+          #  print >> sys.stderr, 'Error, a user in expert union but not belongs to any expert group'
+
+        elif user_id in common_users:
+          gcount.common += 1
+        else :
+          gcount.other += 1
+
+  gcount = GroupCount()  
+  for hour in hour_to_num_tweets.keys():
+    gc = hour_to_num_tweets[hour]
+    gcount.add(gc)
+    percentage = (gcount.population / float(total_num_tweets)) * 100.0
+    percentage_common = (gcount.common / float(total_num_tweets)) * 100.0
+    percentage_other = (gcount.other / float(total_num_tweets)) * 100.0
+    percentage_experts = (gcount.union / float(total_num_tweets)) * 100.0
+    
+    log('%s: %s\t%s\t%s\t%s\t%s\t%s\t%s' % (hour, percentage, percentage_experts,
+                                percentage_common, percentage_other,
+                                (gcount.precision / float(total_num_tweets)) * 100.0,
+                                (gcount.fscore / float(total_num_tweets)) * 100.0,
+                                (gcount.ci / float(total_num_tweets)) * 100.0))
+  log('hour: population\texperts\tcommon\tprecision\tfscore\tci')
 
 def log(message):
   """Helper method to modularize the format of log messages.

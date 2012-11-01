@@ -30,11 +30,13 @@ __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 import FileLog
 import Util
 
+import random
 import experts
 import basic_groups
 import even_groups
 import mixed_model
 import ground_truths
+import draw_precision_recall
 from ground_truths import DataSet
 
 import matplotlib
@@ -54,6 +56,7 @@ from params import _SIZE_TOP_NEWS
 from params import _NUM_GROUPS
 from params import _SIZE_OF_GROUP_IN_PERCENT
 from params import _SWITCHED
+from params import _NON_EXPERTS_SAMPLE_SIZE
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
@@ -428,15 +431,21 @@ def run():
       log('Num Super Experts: %s' %len(super_experts))
       log('Num Social Bias Experts: %s' % len(social_bias_experts))
 
+      non_experts = population.difference(all_experts)
+      sample_size = int(len(non_experts) * _NON_EXPERTS_SAMPLE_SIZE)
+      non_experts_sampled = set(random.sample(non_experts, sample_size))
+
       log('Finding rankings with an %s hour delta.' % delta)
       (market_rankings, newsaholic_rankings,
        active_rankings,
        common_rankings,
-       nonexpert_rankings) = basic_groups.get_rankings(delta, seeds,
-                                                       newsaholics,
-                                                       active_users,
-                                                       all_experts,
-                                                       category)
+       nonexpert_rankings,
+       nonexpert_sample_rankings) = basic_groups.get_rankings(delta, seeds,
+                                                              newsaholics,
+                                                              active_users,
+                                                              non_experts_sampled,
+                                                              all_experts,
+                                                              category)
       (expert_precision_rankings, expert_fscore_rankings,
        expert_ci_rankings,
        expert_s_rankings,
@@ -669,6 +678,8 @@ def run():
                                                                 common_rankings)
       nonexpert_precisions, nonexpert_recalls = calc_precision_recall(gt_rankings,
                                                                       nonexpert_rankings)
+      nonexpert_sample_precisions, nonexpert_sample_recalls = calc_precision_recall(gt_rankings,
+                                                                      nonexpert_sample_rankings)
       (expert_p_precisions,
        expert_p_recalls) = calc_precision_recall(gt_rankings,
                                                  expert_precision_rankings)
@@ -910,6 +921,7 @@ def run():
       basic_groups.draw_crowd_definition(market_precisions, market_recalls,
                                          nonexpert_precisions, nonexpert_recalls,
                                          common_precisions, common_recalls,
+                                         nonexpert_sample_precisions, nonexpert_sample_recalls,
                                          run_params_str)
 
       log('Drawing mixed model precision-recall graph...')
@@ -932,6 +944,20 @@ def run():
       log('Drawing even group model precision graph...')
       # even_groups.draw_precision(market_precisions, groups_precisions,
       even_groups.draw_precision(common_precisions, groups_precisions,
+                                 run_params_str)
+
+      draw_precision_recall.draw([market_precisions, nonexpert_precisions,
+                                  common_precisions, nonexpert_sample_precisions,
+                                  expert_p_precisions, expert_f_precisions,
+                                  expert_c_precisions],
+                                 [market_recalls, nonexpert_recalls,
+                                  common_recalls, nonexpert_sample_recalls,
+                                  expert_p_recalls, expert_f_recalls,
+                                  expert_c_recalls],
+                                 ['Population', 'Non-expert', 'Common',
+                                  'Non-expert (Sample)', 'Precision', 'F-score',
+                                  'CI'],
+                                 'precision_recall_summary',
                                  run_params_str)
 
 
