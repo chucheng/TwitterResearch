@@ -24,13 +24,14 @@ from constants import _HITS_MISSES_FILE_HITS_INDEX
 from constants import _USER_INFO_FILE_ID_INDEX
 from constants import _USER_INFO_FILE_FOLLOWERS_COUNT_INDEX
 from constants import _USER_INFO_FILE_SCREEN_NAME_INDEX
+
+from params import _BETA
+from params import _Z_SCORE
+from params import _EXCLUDE_RETWEETS
 from params import _SWITCHED
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _IN_DIR = '../data/FolkWisdom/'
-
-_BETA = 2
-Z_SCORE = 1.645 # 95% 1 sided
 
 
 def draw_precision_experts(market_precisions, expert_p_precisions,
@@ -152,7 +153,7 @@ def draw_precision_recall_experts(market_precisions, market_recalls,
   labels = ['Market', 'Experts (Precision)', 'Experts (F-score)',
             'Experts (CI)', 'Marks']
   # plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
-  plt.legend(loc=3)
+  plt.legend(loc=0)
 
   max_x = max([max(market_recalls), max(expert_p_recalls),
                max(expert_f_recalls), max(expert_c_recalls),])
@@ -384,6 +385,8 @@ def select_experts_ci(num_users, delta, size_experts, category=None):
   in_dir = _IN_DIR
   if _SWITCHED:
     in_dir += 'switched/'
+  if _EXCLUDE_RETWEETS:
+    in_dir += 'no_retweets/'
   input_file = (in_dir + 'user_hits_and_misses_%s_%s.tsv'
                 % (delta, category))
 
@@ -396,7 +399,7 @@ def select_experts_ci(num_users, delta, size_experts, category=None):
       misses = int(tokens[_HITS_MISSES_FILE_MISSES_INDEX])
       trials = hits + misses
       p_val = float(hits + 2) / (trials + 4)
-      error = Z_SCORE * sqrt((p_val * (1 - p_val)) / float(trials + 4))
+      error = _Z_SCORE * sqrt((p_val * (1 - p_val)) / float(trials + 4))
       low = max(0.0, p_val - error)
       high = min(1.0, p_val + error)
       # avg_of_ci = (low + high) / 2.0
@@ -427,6 +430,8 @@ def select_experts_fscore(size_target_news, num_users, delta, size_experts,
   in_dir = _IN_DIR
   if _SWITCHED:
     in_dir += 'switched/'
+  if _EXCLUDE_RETWEETS:
+    in_dir += 'no_retweets/'
   input_file = (in_dir + 'user_hits_and_misses_%s_%s.tsv'
                 % (delta, category))
 
@@ -470,6 +475,8 @@ def select_experts_precision(valid_users, num_users, delta, size_experts,
   in_dir = _IN_DIR
   if _SWITCHED:
     in_dir += 'switched/'
+  if _EXCLUDE_RETWEETS:
+    in_dir += 'no_retweets/'
   input_file = (in_dir + 'user_hits_and_misses_%s_%s.tsv'
                 % (delta, category))
 

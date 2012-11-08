@@ -48,7 +48,6 @@ import matplotlib.pyplot as plt
 import math
 from math import sqrt
 
-# from constants import _DELTAS
 from params import _DELTAS
 from params import _CATEGORIES
 from params import _SIZE_EXPERTS
@@ -57,26 +56,13 @@ from params import _NUM_GROUPS
 from params import _SIZE_OF_GROUP_IN_PERCENT
 from params import _SWITCHED
 from params import _NON_EXPERTS_SAMPLE_SIZE
+from params import _EXCLUDE_TWEETS_WITHIN_DELTA
+from params import _EXCLUDE_RETWEETS
+
+from constants import _TESTING_SET_MONTHS
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 _LOG_FILE = 'aFolkWisdom.log'
-
-# _SIZE_EXPERTS = .02
-# _SIZE_TOP_NEWS = .02 # This is reset at the beginning of run.
-
-# _NUM_GROUPS = 5
-# _SIZE_OF_GROUP_IN_PERCENT = .02
-
-# _CATEGORIES = []
-# Comment categories in/out individually as needed.
-# _CATEGORIES.append(None)
-# _CATEGORIES.append('world')
-# _CATEGORIES.append('business')
-# _CATEGORIES.append('opinion')
-# _CATEGORIES.append('sports')
-# _CATEGORIES.append('us')
-# _CATEGORIES.append('technology')
-# _CATEGORIES.append('movies')
 
 
 def calculate_diff_avg(ground_truth_url_to_rank, other_rank_to_url):
@@ -372,16 +358,21 @@ def run():
       _SIZE_TOP_NEWS = .02
 
     data_set = DataSet.TESTING
+    retweets = set()
     if _SWITCHED:
       data_set = DataSet.TRAINING
-    gt_rankings = ground_truths.get_gt_rankings(seeds, data_set, category)
+    if _EXCLUDE_RETWEETS:
+      retweets = ground_truths.find_retweets(_TESTING_SET_MONTHS)
+    log('Num retweets to exclude: %s' % len(retweets))
+    gt_rankings = ground_truths.get_gt_rankings(seeds, data_set, category,
+                                                exclude_tweets_within_delta=_EXCLUDE_TWEETS_WITHIN_DELTA,
+                                                retweets=retweets)
     log('Num ground_truth_rankings: %s' % len(gt_rankings))
 
     # Format for use later.
     ground_truth_url_to_rank = {}
     for rank, (url, count) in enumerate(gt_rankings):
       ground_truth_url_to_rank[url] = rank
-
 
     target_news = ground_truths.find_target_news(gt_rankings, _SIZE_TOP_NEWS)
     log('Size target_news: %s' % len(target_news))
@@ -574,8 +565,8 @@ def run():
         output_file.write('\n')
         output_file.write('Total Number of Good News: %s\n' % len(target_news))
 
-      log('Ground Truth Top 5')
-      for i in range(min(len(gt_rankings), 5)):
+      log('Ground Truth Top 50')
+      for i in range(min(len(gt_rankings), 50)):
         url, count = gt_rankings[i]
         log('[%s] %s\t%s' %(i, url.strip(), count))
       log('-----------------------------------')
@@ -746,76 +737,77 @@ def run():
           out_file.write(line)
 
 
-      with open('%sground_truth_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for url, count in gt_rankings:
-          output_file.write('%s\t%s\n' % (url.strip(), count))
-      with open('%smarket_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(common_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                               ground_truth_url_to_rank[url]))
-      with open('%snewsaholic_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(newsaholic_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                               ground_truth_url_to_rank[url]))
-      with open('%sactive_user_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(active_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                               ground_truth_url_to_rank[url]))
-      with open('%scommon_user_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(common_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                               ground_truth_url_to_rank[url]))
-      with open('%snonexpert_user_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(nonexpert_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                               ground_truth_url_to_rank[url]))
-      with open('%sexpert_p_user_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(expert_precision_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                               ground_truth_url_to_rank[url]))
-      with open('%sexpert_f_user_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(expert_fscore_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                               ground_truth_url_to_rank[url]))
-      with open('%sexpert_c_user_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(expert_ci_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                               ground_truth_url_to_rank[url]))
-      with open('%sexpert_s_user_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(expert_s_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                            ground_truth_url_to_rank[url]))
-      with open('%sexpert_sb_user_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(expert_sb_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                            ground_truth_url_to_rank[url]))
-      with open('%smixed_rankings_%s.tsv'
-                % (info_output_dir, run_params_str), 'w') as output_file:
-        for rank, (url, count) in enumerate(mixed_rankings):
-          output_file.write('%s\t%s\t(%s,%s)\n'
-                            % (url.strip(), count, rank,
-                            ground_truth_url_to_rank[url]))
+      if False:
+        with open('%sground_truth_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for url, count in gt_rankings:
+            output_file.write('%s\t%s\n' % (url.strip(), count))
+        with open('%smarket_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(common_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                                 ground_truth_url_to_rank[url]))
+        with open('%snewsaholic_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(newsaholic_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                                 ground_truth_url_to_rank[url]))
+        with open('%sactive_user_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(active_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                                 ground_truth_url_to_rank[url]))
+        with open('%scommon_user_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(common_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                                 ground_truth_url_to_rank[url]))
+        with open('%snonexpert_user_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(nonexpert_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                                 ground_truth_url_to_rank[url]))
+        with open('%sexpert_p_user_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(expert_precision_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                                 ground_truth_url_to_rank[url]))
+        with open('%sexpert_f_user_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(expert_fscore_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                                 ground_truth_url_to_rank[url]))
+        with open('%sexpert_c_user_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(expert_ci_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                                 ground_truth_url_to_rank[url]))
+        with open('%sexpert_s_user_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(expert_s_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                              ground_truth_url_to_rank[url]))
+        with open('%sexpert_sb_user_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(expert_sb_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                              ground_truth_url_to_rank[url]))
+        with open('%smixed_rankings_%s.tsv'
+                  % (info_output_dir, run_params_str), 'w') as output_file:
+          for rank, (url, count) in enumerate(mixed_rankings):
+            output_file.write('%s\t%s\t(%s,%s)\n'
+                              % (url.strip(), count, rank,
+                              ground_truth_url_to_rank[url]))
       
       for i, group_rankings in enumerate(groups_rankings):
         with open('%sgroup_%s_rankings_%s.tsv'
