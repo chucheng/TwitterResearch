@@ -171,11 +171,12 @@ def get_mixed_rankings(market_url_to_rank, market_precisions,
       if ci_rank <= len(expert_c_precisions):
         ci_error = 100.0 - expert_c_precisions[ci_rank - 1]
     mixed_error = min(market_error, precision_error, fscore_error, ci_error)
-    gt_rank = gt_url_to_rank[url]
-    if mixed_error in mixed_error_to_url_list:
-      mixed_error_to_url_list[mixed_error].append((url, gt_rank))
-    else:
-      mixed_error_to_url_list[mixed_error] = [(url, gt_rank), ]
+    if url in gt_url_to_rank:
+      gt_rank = gt_url_to_rank[url]
+      if mixed_error in mixed_error_to_url_list:
+        mixed_error_to_url_list[mixed_error].append((url, gt_rank))
+      else:
+        mixed_error_to_url_list[mixed_error] = [(url, gt_rank), ]
 
   rankings = break_ties(mixed_error_to_url_list)
   return rankings

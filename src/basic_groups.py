@@ -18,6 +18,8 @@ from constants import _TIMEDELTAS_FILE_USER_ID_INDEX
 from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
 from constants import _USER_ACTIVITY_FILE_ID_INDEX
+
+from params import _EXCLUDE_RETWEETS
 from params import _SWITCHED
 
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
@@ -321,6 +323,8 @@ def group_users(delta, category=None):
   user_ids_sorted = []
   if _SWITCHED:
     in_dir += 'switched/'
+  if _EXCLUDE_RETWEETS:
+    in_dir += 'no_retweets/'
   input_file = in_dir + 'user_activity_%s_%s.tsv' % (delta, category)
   with open(input_file) as input_file:
     for line in input_file:

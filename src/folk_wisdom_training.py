@@ -18,24 +18,18 @@ from constants import _TWEETFILE_USER_ID_INDEX
 from constants import _TWEETFILE_CREATED_AT_INDEX
 from constants import _TWEETFILE_TWEET_TEXT_INDEX
 from constants import _DATETIME_FORMAT
-from constants import _DELTAS
-from constants import _TRAINING_SET_MONTHS
-from constants import _TESTING_SET_MONTHS
+
+from params import _DELTAS
+from params import _CATEGORIES
+from params import _SIZE_TOP_NEWS
+from params import _TRAINING_SET_MONTHS
+from params import _TESTING_SET_MONTHS
+from params import _EXCLUDE_RETWEETS
+from params import _EXCLUDE_TWEETS_WITHIN_DELTA
 from params import _SWITCHED
 
 _LOG_FILE = 'folk_wisdom_training.log'
 _OUT_DIR = '../data/FolkWisdom/'
-
-_CATEGORIES = []
-_CATEGORIES.append(None)
-# _CATEGORIES.append('world')
-# _CATEGORIES.append('business')
-# _CATEGORIES.append('opinion')
-# _CATEGORIES.append('sports')
-# _CATEGORIES.append('us')
-# _CATEGORIES.append('technology')
-# _CATEGORIES.append('movies')
-
 
 
 def find_hits_and_mises(months, target_news, seeds, cache, delta,
@@ -154,30 +148,47 @@ def run():
   global _OUT_DIR
   cache = Util.load_cache()
   seeds = Util.load_seeds()
+
+  # Set up params appropriately.
+  data_set = DataSet.TRAINING
+  months = _TRAINING_SET_MONTHS
   if _SWITCHED:
+    data_set = DataSet.TESTING
+    months = _TESTING_SET_MONTHS
     _OUT_DIR += 'switched/'
+  retweets = set()
+  if _EXCLUDE_RETWEETS:
+    retweets = ground_truths.find_retweets(months)
+    _OUT_DIR += 'no_retweets/'
+
   Util.ensure_dir_exist(_OUT_DIR)
   log('Output dir: %s' % _OUT_DIR)
 
-
   for delta in _DELTAS:
     for category in _CATEGORIES:
-      if _SWITCHED:
-        gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TESTING,
-                                                    category)
-        sort_users_by_tweet_count(_TESTING_SET_MONTHS, seeds, cache,
-                                  delta, category)
-        target_news = ground_truths.find_target_news(gt_rankings, .02)
-        find_hits_and_mises(_TESTING_SET_MONTHS, target_news, seeds, cache,
-                            delta, category)
-      else:
-        gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TRAINING,
-                                                    category)
-        sort_users_by_tweet_count(_TRAINING_SET_MONTHS, seeds, cache,
-                                  delta, category)
-        target_news = ground_truths.find_target_news(gt_rankings, .02)
-        find_hits_and_mises(_TRAINING_SET_MONTHS, target_news, seeds, cache,
-                            delta, category)
+      gt_rankings = ground_truths.get_gt_rankings(seeds, data_set, category,
+                                                  exclude_tweets_within_delta=_EXCLUDE_TWEETS_WITHIN_DELTA,
+                                                  retweets=retweets)
+      sort_users_by_tweet_count(months, seeds, cache, delta, category)
+      target_news = ground_truths.find_target_news(gt_rankings, _SIZE_TOP_NEWS)
+      find_hits_and_mises(months, target_news, seeds, cache,
+                          delta, category)
+#      if _SWITCHED:
+#        gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TESTING,
+#                                                    category)
+#        sort_users_by_tweet_count(_TESTING_SET_MONTHS, seeds, cache,
+#                                  delta, category)
+#        target_news = ground_truths.find_target_news(gt_rankings, .02)
+#        find_hits_and_mises(_TESTING_SET_MONTHS, target_news, seeds, cache,
+#                            delta, category)
+#      else:
+#        gt_rankings = ground_truths.get_gt_rankings(seeds, DataSet.TRAINING,
+#                                                    category)
+#        sort_users_by_tweet_count(_TRAINING_SET_MONTHS, seeds, cache,
+#                                  delta, category)
+#        target_news = ground_truths.find_target_news(gt_rankings, .02)
+#        find_hits_and_mises(_TRAINING_SET_MONTHS, target_news, seeds, cache,
+#                            delta, category)
 
   log('Finished outputting data!')
 
