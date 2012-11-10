@@ -500,6 +500,28 @@ def select_experts_precision(valid_users, num_users, delta, size_experts,
   return experts
 
 
+def split_ci_experts_by_followers(ci_experts):
+  users = {}
+  ci_hi = set()
+  ci_li = set()
+  with open('../data/SocialHubBias/user_info.tsv') as in_file:
+    for line in in_file:
+      tokens = line.split('\t')
+      user_id = tokens[_USER_INFO_FILE_ID_INDEX]
+      if user_id in ci_experts:
+        num_followers = int(tokens[_USER_INFO_FILE_FOLLOWERS_COUNT_INDEX])
+        screen_name = tokens[_USER_INFO_FILE_SCREEN_NAME_INDEX]
+        users[user_id] = (num_followers, screen_name)
+    users_sorted = sorted(users.items(), key=lambda x: x[1][0], reverse=True)
+    for i in range(len(users_sorted)):
+      user_id, (_,_) = users_sorted[i]
+      if i < len(users_sorted) / 2:
+        ci_hi.add(user_id)
+      else:
+        ci_li.add(user_id)
+  return ci_hi, ci_li
+
+
 def select_experts_social_bias(num_users, size_experts):
   users = {}
   with open('../data/SocialHubBias/user_info.tsv') as in_file:
