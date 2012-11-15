@@ -461,13 +461,17 @@ def run():
                             run_params_str)
 
       log('Drawing crowd def precision-recall graph...')
-      precision_recall.draw([precisions.population, precisions.non_experts,
-                             precisions.common_users, precisions.non_experts_sampled],
-                            [recalls.population, recalls.non_experts,
-                             recalls.common_users, recalls.non_experts_sampled],
-                            ['Population', 'Non-experts', 'Common Users',
-                             'Non-experts sampling'],
+      precision_recall.draw([precisions.non_experts, precisions.common_users],
+                            [recalls.non_experts, recalls.common_users],
+                            ['Crowd', 'Inactive Crowd'],
                             'precision_recall_crowd_def',
+                            run_params_str)
+
+      log('Drawing non_expert_sampling precision-recall graph...')
+      precision_recall.draw([precisions.non_experts, precisions.non_experts_sampled],
+                            [recalls.non_experts, recalls.non_experts_sampled],
+                            ['Crowd', 'Crowd (33% sample)'],
+                            'precision_recall_non_expert_sampling',
                             run_params_str)
 
       # TODO: Replace with new method.

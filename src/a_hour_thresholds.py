@@ -31,6 +31,8 @@ class GroupCount:
   union = 0
   other = 0
 
+  non_experts = 0
+
   precision = 0
   fscore = 0
   ci = 0
@@ -40,6 +42,7 @@ class GroupCount:
     self.common += gc.common
     self.union += gc.union
     self.other += gc.other
+    self.non_experts += gc.non_experts
     self.precision += gc.precision
     self.fscore += gc.fscore
     self.ci += gc.ci
@@ -84,6 +87,9 @@ def run():
     log('Num experts (ci): %s' % len(ExpertGroup.ci))
     log('Num all experts: %s' % len(ExpertGroup.union))
 
+    non_experts = population.difference(ExpertGroup.union)
+    log('Num non_experts: %s' % len(non_experts))
+
     # other_users = population.difference(all_experts).difference(common_users)
 
 
@@ -123,6 +129,9 @@ def run():
           else :
             gcount.other += 1
 
+          if user_id in non_experts:
+            gcount.non_experts += 1
+
     gcount = GroupCount()  
     with open(_DATA_DIR + 'hour_thresholds_%s.tsv' % delta, 'w') as out_file:
       for hour in hour_to_num_tweets.keys():
@@ -132,20 +141,17 @@ def run():
         percentage_common = (gcount.common / float(total_num_tweets)) * 100.0
         percentage_other = (gcount.other / float(total_num_tweets)) * 100.0
         percentage_experts = (gcount.union / float(total_num_tweets)) * 100.0
+        percentage_non_experts = (gcount.non_experts / float(total_num_tweets)) * 100.0
         
-        out_file.write('%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' % (hour, percentage,
-                                                             percentage_experts,
-                                                             percentage_common,
-                                                             percentage_other,
-                                                             (gcount.precision / float(total_num_tweets)) * 100.0,
-                                                             (gcount.fscore / float(total_num_tweets)) * 100.0,
-                                                             (gcount.ci / float(total_num_tweets)) * 100.0))
-        log('%s: %s\t%s\t%s\t%s\t%s\t%s\t%s' % (hour, percentage, percentage_experts,
-                                    percentage_common, percentage_other,
-                                    (gcount.precision / float(total_num_tweets)) * 100.0,
-                                    (gcount.fscore / float(total_num_tweets)) * 100.0,
-                                    (gcount.ci / float(total_num_tweets)) * 100.0))
-    log('hour: population\texperts\tcommon\tprecision\tfscore\tci')
+        out_file.write('%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' % (hour, percentage,
+                                                                 percentage_non_experts,
+                                                                 percentage_experts,
+                                                                 percentage_common,
+                                                                 percentage_other,
+                                                                 (gcount.precision / float(total_num_tweets)) * 100.0,
+                                                                 (gcount.fscore / float(total_num_tweets)) * 100.0,
+                                                                 (gcount.ci / float(total_num_tweets)) * 100.0))
+    log('hour\tpopulation\tnon_experts\texperts\tcommon\tprecision\tfscore\tci')
 
 def log(message):
   """Helper method to modularize the format of log messages.
