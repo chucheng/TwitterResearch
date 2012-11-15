@@ -30,6 +30,7 @@ __author__ = 'Chris Moghbel (cmoghbel@cs.ucla.edu)'
 import FileLog
 import Util
 
+import experts
 import user_groups
 import rankings
 import mixed_model
@@ -98,7 +99,6 @@ def run():
 
       log('Finding rankings with an %s hour delta.' % delta)
       ranks = rankings.get_rankings(delta, seeds, groups, category)
-
 
       # Output some interesting info to file
       size_market_unfiltered = '0'
@@ -235,7 +235,10 @@ def run():
       precision_url_to_rank = {}
       fscore_url_to_rank = {}
       ci_url_to_rank = {}
-      for rank, (url, count) in enumerate(ranks.population):
+      ci_1_url_to_rank = {}
+      ci_2_url_to_rank = {}
+      ci_3_url_to_rank = {}
+      for rank, (url, count) in enumerate(ranks.non_experts):
         market_url_to_rank[url] = rank
       for rank, (url, count) in enumerate(ranks.precision):
         precision_url_to_rank[url] = rank
@@ -243,6 +246,12 @@ def run():
         fscore_url_to_rank[url] = rank
       for rank, (url, count) in enumerate(ranks.ci):
         ci_url_to_rank[url] = rank
+      for rank, (url, count) in enumerate(ranks.ci_1):
+        ci_1_url_to_rank[url] = rank
+      for rank, (url, count) in enumerate(ranks.ci_2):
+        ci_2_url_to_rank[url] = rank
+      for rank, (url, count) in enumerate(ranks.ci_3):
+        ci_3_url_to_rank[url] = rank
 
       precisions, recalls = precision_recall.get_precision_recalls(gt_rankings, ranks)
 
@@ -256,8 +265,22 @@ def run():
                                                       precisions.ci,
                                                       ground_truth_url_to_rank)
 
+      mixed_ci_rankings = mixed_model.get_mixed_rankings(market_url_to_rank,
+                                                         precisions.population,
+                                                         ci_1_url_to_rank,
+                                                         precisions.ci_1,
+                                                         ci_2_url_to_rank,
+                                                         precisions.ci_2,
+                                                         ci_3_url_to_rank,
+                                                         precisions.ci_3,
+                                                         ground_truth_url_to_rank)
+                                                         
+
       mixed_precisions, mixed_recalls = precision_recall.calc_precision_recall(gt_rankings, 
                                                                                mixed_rankings)
+
+      mixed_ci_precisions, mixed_ci_recalls = precision_recall.calc_precision_recall(gt_rankings, 
+                                                                                     mixed_ci_rankings)
 
       log('-----------------------------------')
       log('Mixed (min) Top 5')
@@ -391,13 +414,21 @@ def run():
                             'precision_recall_all',
                             run_params_str)
 
-      precision_recall.draw([precisions.non_experts, precisions.precision,
-                             precisions.fscore, precisions.ci],
-                            [recalls.non_experts, recalls.precision,
-                             recalls.fscore, recalls.ci],
-                            ['Crowd', 'Precision', 'F-score', 'CI'],
-                            'precision_recall_experts',
-                            run_params_str)
+      # Draw via old method because it has fancy markings.
+      experts.draw_precision_recall_experts(precisions.non_experts, recalls.non_experts,
+                                            precisions.precision, recalls.precision,
+                                            precisions.fscore, recalls.fscore,
+                                            precisions.ci, recalls.ci,
+                                            run_params_str)
+
+      log('Drawing experts precision-recall graph...')
+      # precision_recall.draw([precisions.non_experts, precisions.precision,
+      #                        precisions.fscore, precisions.ci],
+      #                       [recalls.non_experts, recalls.precision,
+      #                        recalls.fscore, recalls.ci],
+      #                       ['Crowd', 'Precision', 'F-score', 'CI'],
+      #                       'precision_recall_experts',
+      #                       run_params_str)
 
       log('Drawing ci breakdown by followers precisions-recall graph...')
       precision_recall.draw([precisions.non_experts, precisions.ci,
@@ -441,9 +472,16 @@ def run():
 
       # TODO: Replace with new method.
       log('Drawing mixed model precision-recall graph...')
-      mixed_model.draw_precision_recall_mixed(precisions.common_users, recalls.common_users,
+      mixed_model.draw_precision_recall_mixed(precisions.non_experts, recalls.non_experts,
                                               mixed_precisions, mixed_recalls,
                                               run_params_str)
+
+      log('Drawing mixed ci model precision-recall graph...')
+      precision_recall.draw([precisions.non_experts, mixed_ci_precisions],
+                            [recalls.non_experts, mixed_ci_recalls],
+                            ['Crowd', 'Mixed'],
+                            'precision_recall_mixed_ci',
+                            run_params_str)
 
 
 def log(message):

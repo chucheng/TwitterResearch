@@ -36,6 +36,9 @@ def gather_tweet_counts(hours, seeds, groups, category=None):
   tweet_counts.ci = {}
   tweet_counts.ci_hi = {}
   tweet_counts.ci_li = {}
+  tweet_counts.ci_1 = {}
+  tweet_counts.ci_2 = {}
+  tweet_counts.ci_3 = {}
   tweet_counts.super_experts = {}
   tweet_counts.social_bias = {}
   tweet_counts.newsaholics = {}
@@ -74,6 +77,9 @@ def gather_tweet_counts(hours, seeds, groups, category=None):
           increment_tweet_count(groups.ci, tweet_counts.ci, user_id, url)
           increment_tweet_count(groups.ci_hi, tweet_counts.ci_hi, user_id, url)
           increment_tweet_count(groups.ci_li, tweet_counts.ci_li, user_id, url)
+          increment_tweet_count(groups.ci_1, tweet_counts.ci_1, user_id, url)
+          increment_tweet_count(groups.ci_2, tweet_counts.ci_3, user_id, url)
+          increment_tweet_count(groups.ci_3, tweet_counts.ci_3, user_id, url)
           increment_tweet_count(groups.super_experts, tweet_counts.super_experts, user_id, url)
           increment_tweet_count(groups.social_bias, tweet_counts.social_bias, user_id, url)
           increment_tweet_count(groups.newsaholics, tweet_counts.newsaholics, user_id, url)
@@ -121,6 +127,9 @@ def sort_tweet_counts(tweet_counts):
   rankings.ci = sorted(tweet_counts.ci.items(), key=lambda x: x[1], reverse=True)
   rankings.ci_hi = sorted(tweet_counts.ci_hi.items(), key=lambda x: x[1], reverse=True)
   rankings.ci_li = sorted(tweet_counts.ci_li.items(), key=lambda x: x[1], reverse=True)
+  rankings.ci_1 = sorted(tweet_counts.ci_1.items(), key=lambda x: x[1], reverse=True)
+  rankings.ci_2 = sorted(tweet_counts.ci_3.items(), key=lambda x: x[1], reverse=True)
+  rankings.ci_3 = sorted(tweet_counts.ci_3.items(), key=lambda x: x[1], reverse=True)
   rankings.non_experts = sorted(tweet_counts.non_experts.items(), key=lambda x: x[1], reverse=True)
   rankings.non_experts_sampled = sorted(tweet_counts.non_experts_sampled.items(), key=lambda x: x[1], reverse=True)
   rankings.super_experts = sorted(tweet_counts.super_experts.items(), key=lambda x: x[1], reverse=True)

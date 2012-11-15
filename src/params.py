@@ -1,10 +1,10 @@
 # Comment categories in/out individually as needed.
 _CATEGORIES = [
-  None,
+  # None,
   # 'world',
   # 'business',
   # 'opinion',
-  # 'sports',
+  'sports',
   # 'us',
   # 'technology'
   # 'movies'
@@ -23,7 +23,7 @@ _FULL_SET_MONTHS = ['08', '09', '10', '11', '12', '01']
 _WINDOW_MONTHS = ['09', '10', '11', '12']
 
 _SIZE_EXPERTS = .02
-_SIZE_TOP_NEWS = .02
+_SIZE_TOP_NEWS = .10
 _NUM_GROUPS = 5
 _SIZE_OF_GROUP_IN_PERCENT = .02
 _NON_EXPERTS_SAMPLE_SIZE = .33

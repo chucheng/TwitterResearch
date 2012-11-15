@@ -99,6 +99,14 @@ def draw_precision_recall_experts(market_precisions, market_recalls,
   figure = plt.figure()
   axs = figure.add_subplot(111)
 
+  market_precisions_m = []
+  market_recalls_m = []
+  for (i, (precision, recall)) in enumerate(zip(market_precisions, 
+                                                market_recalls)):
+    if i % 40 == 20:
+      market_precisions_m.append(precision)
+      market_recalls_m.append(recall)
+
   expert_p_precisions_m = []
   expert_p_recalls_m = []
   for (i, (precision, recall)) in enumerate(zip(expert_p_precisions,
@@ -123,7 +131,7 @@ def draw_precision_recall_experts(market_precisions, market_recalls,
       expert_c_precisions_m.append(precision)
       expert_c_recalls_m.append(recall)
 
-  market_plot = axs.plot(market_recalls, market_precisions, label='Crowd')
+  market_plot = axs.plot(market_recalls, market_precisions)
   plots.append(market_plot)
 
   expert_p_plot = axs.plot(expert_p_recalls, expert_p_precisions,
@@ -136,24 +144,28 @@ def draw_precision_recall_experts(market_precisions, market_recalls,
                            linewidth=1)
   plots.append(expert_c_plot)
 
+  market_m_plot = axs.plot(market_recalls_m, market_precisions_m, 'bo')
+  plots.append(market_m_plot)
+
   expert_p_m_plot = axs.plot(expert_p_recalls_m, expert_p_precisions_m, 'g^')
   plots.append(expert_p_m_plot)
 
-  expert_f_m_plot = axs.plot(expert_f_recalls_m, expert_f_precisions_m, 'ro')
+  expert_f_m_plot = axs.plot(expert_f_recalls_m, expert_f_precisions_m, 'rD')
   plots.append(expert_f_m_plot)
 
   expert_c_m_plot = axs.plot(expert_c_recalls_m, expert_c_precisions_m, 'cs')
   plots.append(expert_c_m_plot)
 
+  p = axs.plot([0], [0], '-bo', label='Crowd')
   p = axs.plot([0], [0], '-g^', label='Experts (Frequency)')
-  p = axs.plot([0], [0], '-ro', label='Experts (F-score)')
+  p = axs.plot([0], [0], '-rD', label='Experts (F-score)')
   p = axs.plot([0], [0], '-cs', label='Experts (CI)')
   plots.append(p)
 
   labels = ['Market', 'Experts (Precision)', 'Experts (F-score)',
             'Experts (CI)', 'Marks']
   # plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
-  plt.legend(loc=0)
+  plt.legend(loc=3)
 
   max_x = max([max(market_recalls), max(expert_p_recalls),
                max(expert_f_recalls), max(expert_c_recalls),])
