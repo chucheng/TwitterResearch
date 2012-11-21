@@ -1,3 +1,4 @@
+import math
 import Util
 import user_groups
 
@@ -11,7 +12,7 @@ from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
 from params import _SWITCHED
 
 
-def gather_tweet_counts(hours, seeds, groups, category=None):
+def gather_tweet_counts(hours, seeds, groups, d_num_followers, category=None):
   """Gathers the tweet counts for a given set of months.
   
   Only counts votes if they occur within the given time delta from the seed
@@ -46,6 +47,10 @@ def gather_tweet_counts(hours, seeds, groups, category=None):
   tweet_counts.common_users = {}
   tweet_counts.non_experts = {}
   tweet_counts.non_experts_sampled = {}
+  tweet_counts.non_experts_25 = {}
+  tweet_counts.non_experts_10 = {}
+  tweet_counts.non_experts_1 = {}
+  tweet_counts.weighted_followers = {}
 
   with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
     for line in input_file:
@@ -87,6 +92,14 @@ def gather_tweet_counts(hours, seeds, groups, category=None):
           increment_tweet_count(groups.common_users, tweet_counts.common_users, user_id, url)
           increment_tweet_count(groups.non_experts, tweet_counts.non_experts, user_id, url)
           increment_tweet_count(groups.non_experts_sampled, tweet_counts.non_experts_sampled, user_id, url)
+          increment_tweet_count(groups.non_experts_25, tweet_counts.non_experts_25, user_id, url)
+          increment_tweet_count(groups.non_experts_10, tweet_counts.non_experts_10, user_id, url)
+          increment_tweet_count(groups.non_experts_1, tweet_counts.non_experts_1, user_id, url)
+          weight = 1.0
+          if user_id in d_num_followers:
+            num_followers = d_num_followers[user_id] + 1 # need to account for the case of 0 followers
+            weight = math.log(num_followers)
+          increment_tweet_count(groups.ci, tweet_counts.weighted_followers, user_id, url, weight=weight)
 
                 
   return tweet_counts
@@ -108,12 +121,12 @@ def category_matches(category, url_category):
   return category_matches
 
 
-def increment_tweet_count(group, tc, user_id, url):
+def increment_tweet_count(group, tc, user_id, url, weight=1.0):
   if user_id in group:
     if url in tc:
-      tc[url] += 1
+      tc[url] += weight * 1
     else:
-      tc[url] = 1
+      tc[url] = weight * 1
 
 
 def sort_tweet_counts(tweet_counts):
@@ -132,12 +145,16 @@ def sort_tweet_counts(tweet_counts):
   rankings.ci_3 = sorted(tweet_counts.ci_3.items(), key=lambda x: x[1], reverse=True)
   rankings.non_experts = sorted(tweet_counts.non_experts.items(), key=lambda x: x[1], reverse=True)
   rankings.non_experts_sampled = sorted(tweet_counts.non_experts_sampled.items(), key=lambda x: x[1], reverse=True)
+  rankings.non_experts_25 = sorted(tweet_counts.non_experts_25.items(), key=lambda x: x[1], reverse=True)
+  rankings.non_experts_10 = sorted(tweet_counts.non_experts_10.items(), key=lambda x: x[1], reverse=True)
+  rankings.non_experts_1 = sorted(tweet_counts.non_experts_1.items(), key=lambda x: x[1], reverse=True)
   rankings.super_experts = sorted(tweet_counts.super_experts.items(), key=lambda x: x[1], reverse=True)
-  rankings.social_bias= sorted(tweet_counts.social_bias.items(), key=lambda x: x[1], reverse=True)
+  rankings.social_bias = sorted(tweet_counts.social_bias.items(), key=lambda x: x[1], reverse=True)
+  rankings.weighted_followers = sorted(tweet_counts.weighted_followers.items(), key=lambda x: x[1], reverse=True)
   return rankings
 
 
-def get_rankings(delta, seeds, groups, category):
-  tweet_counts = gather_tweet_counts(delta, seeds, groups, category)
+def get_rankings(delta, seeds, groups, category, d_num_followers):
+  tweet_counts = gather_tweet_counts(delta, seeds, groups, d_num_followers, category)
   rankings = sort_tweet_counts(tweet_counts)
   return rankings

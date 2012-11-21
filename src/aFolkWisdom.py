@@ -90,7 +90,7 @@ def run():
       Util.ensure_dir_exist(info_output_dir)
 
 
-      groups = user_groups.get_all_user_groups(delta, category)
+      groups, d_num_followers  = user_groups.get_all_user_groups(delta, category)
       log('Num experts (precision): %s' % len(groups.precision))
       log('Num experts (fscore): %s' % len(groups.fscore))
       log('Num experts (ci): %s' % len(groups.ci))
@@ -98,7 +98,7 @@ def run():
       log('Num Social Bias Experts: %s' % len(groups.social_bias))
 
       log('Finding rankings with an %s hour delta.' % delta)
-      ranks = rankings.get_rankings(delta, seeds, groups, category)
+      ranks = rankings.get_rankings(delta, seeds, groups, category, d_num_followers)
 
       # Output some interesting info to file
       size_market_unfiltered = '0'
@@ -238,6 +238,7 @@ def run():
       ci_1_url_to_rank = {}
       ci_2_url_to_rank = {}
       ci_3_url_to_rank = {}
+      common_url_to_rank = {}
       for rank, (url, count) in enumerate(ranks.non_experts):
         market_url_to_rank[url] = rank
       for rank, (url, count) in enumerate(ranks.precision):
@@ -252,6 +253,8 @@ def run():
         ci_2_url_to_rank[url] = rank
       for rank, (url, count) in enumerate(ranks.ci_3):
         ci_3_url_to_rank[url] = rank
+      for rank, (url, count) in enumerate(ranks.common_users):
+        common_url_to_rank[url] = rank
 
       precisions, recalls = precision_recall.get_precision_recalls(gt_rankings, ranks)
 
@@ -296,6 +299,7 @@ def run():
           precision_rank = 0
           ci_rank = 0
           fscore_rank = 0
+          inactive_crowd_rank = 0
           if gt_url in market_url_to_rank:
             market_rank = market_url_to_rank[gt_url] + 1
           if gt_url in precision_url_to_rank:
@@ -304,9 +308,13 @@ def run():
             ci_rank = ci_url_to_rank[gt_url] + 1
           if gt_url in fscore_url_to_rank:
             fscore_rank = fscore_url_to_rank[gt_url] + 1
-          line = '%s\t%s\t%s\t%s\t%s\t%s\n' % (gt_url, gt_rank + 1, market_rank,
-                                               precision_rank, ci_rank,
-                                               fscore_rank)
+          if gt_url in common_url_to_rank:
+            inactive_crowd_rank = common_url_to_rank[gt_url] + 1
+          line = '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' % (gt_url, gt_rank + 1,
+                                                   market_rank,
+                                                   inactive_crowd_rank,
+                                                   precision_rank, ci_rank,
+                                                   fscore_rank)
           out_file.write(line)
 
 
@@ -468,11 +476,16 @@ def run():
                             run_params_str)
 
       log('Drawing non_expert_sampling precision-recall graph...')
-      precision_recall.draw([precisions.non_experts, precisions.non_experts_sampled],
-                            [recalls.non_experts, recalls.non_experts_sampled],
-                            ['Crowd', 'Crowd (33% sample)'],
-                            'precision_recall_non_expert_sampling',
-                            run_params_str)
+      precision_recall.draw_with_markers([precisions.non_experts, precisions.non_experts_sampled,
+                                          precisions.non_experts_10, precisions.non_experts_25,
+                                          precisions.non_experts_1],
+                                          [recalls.non_experts, recalls.non_experts_sampled,
+                                           recalls.non_experts_10, recalls.non_experts_25,
+                                           recalls.non_experts_1],
+                                          ['Crowd', 'Crowd (33% sample)', 'Crowd (10% sample)',
+                                           'Crowd (5% sample)', 'Crowd (1% sample)'],
+                                          'precision_recall_non_expert_sampling',
+                                          0, run_params_str)
 
       # TODO: Replace with new method.
       log('Drawing mixed model precision-recall graph...')
@@ -485,6 +498,13 @@ def run():
                             [recalls.non_experts, mixed_ci_recalls],
                             ['Crowd', 'Mixed'],
                             'precision_recall_mixed_ci',
+                            run_params_str)
+
+      log('Drawing weighted followers precision-recall graph...')
+      precision_recall.draw([precisions.non_experts, precisions.weighted_followers, precisions.ci],
+                            [recalls.non_experts, recalls.weighted_followers, recalls.ci],
+                            ['Crowd', 'Weighted Followers', 'CI'],
+                            'precision_recall_weighted_followers',
                             run_params_str)
 
 

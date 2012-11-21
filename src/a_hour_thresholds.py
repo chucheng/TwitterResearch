@@ -121,16 +121,20 @@ def run():
               gcount.fscore += 1
             if user_id in ExpertGroup.ci:
               gcount.ci += 1
+          else:
+            gcount.non_experts += 1
+            if user_id in common_users:
+              gcount.common += 1
             
             #  print >> sys.stderr, 'Error, a user in expert union but not belongs to any expert group'
 
-          elif user_id in common_users:
-            gcount.common += 1
-          else :
-            gcount.other += 1
+          # elif user_id in common_users:
+          #   gcount.common += 1
+          # else :
+          #   gcount.other += 1
 
-          if user_id in non_experts:
-            gcount.non_experts += 1
+          # if user_id in non_experts:
+          #   gcount.non_experts += 1
 
     gcount = GroupCount()  
     with open(_DATA_DIR + 'hour_thresholds_%s.tsv' % delta, 'w') as out_file:
@@ -143,14 +147,13 @@ def run():
         percentage_experts = (gcount.union / float(total_num_tweets)) * 100.0
         percentage_non_experts = (gcount.non_experts / float(total_num_tweets)) * 100.0
         
-        out_file.write('%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' % (hour, percentage,
-                                                                 percentage_non_experts,
-                                                                 percentage_experts,
-                                                                 percentage_common,
-                                                                 percentage_other,
-                                                                 (gcount.precision / float(total_num_tweets)) * 100.0,
-                                                                 (gcount.fscore / float(total_num_tweets)) * 100.0,
-                                                                 (gcount.ci / float(total_num_tweets)) * 100.0))
+        out_file.write('%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' % (hour, percentage,
+                                                             percentage_non_experts,
+                                                             percentage_experts,
+                                                             percentage_common,
+                                                             (gcount.precision / float(total_num_tweets)) * 100.0,
+                                                             (gcount.fscore / float(total_num_tweets)) * 100.0,
+                                                             (gcount.ci / float(total_num_tweets)) * 100.0))
     log('hour\tpopulation\tnon_experts\texperts\tcommon\tprecision\tfscore\tci')
 
 def log(message):

@@ -17,15 +17,76 @@ def draw(precisions_list, recalls_list, labels, file_prefix, run_params_str):
   figure = plt.figure()
   axs = figure.add_subplot(111)
 
+  line_types = ['-', '--']
+  line_widths = [1, 2]
+
   max_x = 0
-  for (precisions, recalls) in zip(precisions_list, recalls_list):
-    plot = axs.plot(recalls, precisions, '--', linewidth=2)
+  for plot_num, (precisions, recalls) in enumerate(zip(precisions_list, recalls_list)):
+    line_type = line_types[plot_num % len(line_types)]
+    linewidth = line_widths[plot_num % len(line_widths)]
+    plot = axs.plot(recalls, precisions, line_type, linewidth=linewidth)
     plots.append(plot)
     max_recall = max(recalls)
     if max_recall > max_x:
       max_x = max_recall
 
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
+  plt.axis([0, max_x + 5, 0, 105])
+  plt.grid(True, which='major', linewidth=1)
+
+  axs.xaxis.set_minor_locator(MultipleLocator(5))
+  axs.yaxis.set_minor_locator(MultipleLocator(5))
+  plt.grid(True, which='minor')
+
+  plt.xlabel('Recall (%)')
+  plt.ylabel('Precision (%)')
+
+  with open(_GRAPH_DIR + run_params_str + '/%s_%s.png'
+            % (file_prefix, run_params_str), 'w') as graph:
+    plt.savefig(graph, format='png')
+  with open(_GRAPH_DIR + run_params_str + '/%s_%s.eps'
+            % (file_prefix, run_params_str), 'w') as graph:
+    plt.savefig(graph, format='eps')
+
+  plt.close()
+
+
+def draw_with_markers(precisions_list, recalls_list, labels, file_prefix,
+                      legend_location, run_params_str):
+  plots = []
+  figure = plt.figure()
+  axs = figure.add_subplot(111)
+
+  line_types = ['-']
+  line_widths = [1]
+  marker_types = ['bo', 'g^', 'rD', 'cs', 'm,']
+
+  max_x = 0
+  for plot_num, (precisions, recalls) in enumerate(zip(precisions_list, recalls_list)):
+    precision_markers = []
+    recall_markers = []
+    for (i, (precision, recall)) in enumerate(zip(precisions, recalls)):
+      if i % 40 == 0:
+        precision_markers.append(precision)
+        recall_markers.append(recall)
+    line_type = line_types[plot_num % len(line_types)]
+    linewidth = line_widths[plot_num % len(line_widths)]
+    plot = axs.plot(recalls, precisions, line_type, linewidth=linewidth)
+    plots.append(plot)
+    marker_type = marker_types[plot_num % len(marker_types)]
+    markers_plot = axs.plot(recall_markers, precision_markers, marker_type)
+    plots.append(markers_plot)
+    max_recall = max(recalls)
+    if max_recall > max_x:
+      max_x = max_recall
+
+  p = None
+  for i, label in enumerate(labels):
+    line_type = '-%s' % marker_types[i % len(marker_types)]
+    p = axs.plot([0], [0], line_type, label=label)
+  plots.append(p)
+
+  plt.legend(loc=legend_location)
   plt.axis([0, max_x + 5, 0, 105])
   plt.grid(True, which='major', linewidth=1)
 
@@ -107,6 +168,10 @@ def get_precision_recalls(gt_rankings, rankings):
   precisions.social_bias, recalls.social_bias = calc_precision_recall(gt_rankings, rankings.social_bias)
   precisions.non_experts, recalls.non_experts = calc_precision_recall(gt_rankings, rankings.non_experts)
   precisions.non_experts_sampled, recalls.non_experts_sampled = calc_precision_recall(gt_rankings, rankings.non_experts_sampled)
+  precisions.non_experts_25, recalls.non_experts_25 = calc_precision_recall(gt_rankings, rankings.non_experts_25)
+  precisions.non_experts_10, recalls.non_experts_10 = calc_precision_recall(gt_rankings, rankings.non_experts_10)
+  precisions.non_experts_1, recalls.non_experts_1 = calc_precision_recall(gt_rankings, rankings.non_experts_1)
   precisions.super_experts, recalls.super_experts = calc_precision_recall(gt_rankings, rankings.super_experts)
+  precisions.weighted_followers, recalls.weighted_followers = calc_precision_recall(gt_rankings, rankings.weighted_followers)
 
   return precisions, recalls

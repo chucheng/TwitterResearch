@@ -38,6 +38,10 @@ class UserGroups:
   all_experts = None
   non_experts = None
   non_experts_sampled = None
+  non_experts_25 = None
+  non_experts_10 = None
+  non_experts_1 = None
+  weighted_followers = None
 
 
 def get_all_user_groups(delta=4, category=None):
@@ -98,13 +102,19 @@ def get_all_user_groups(delta=4, category=None):
       groups.ci_3.add(ci_expert)
     counter += 1
 
-  groups.social_bias = experts.select_experts_social_bias(num_users,
-                                                           _SIZE_EXPERTS)
+  groups.social_bias, d_num_followers  = experts.select_experts_social_bias(num_users,
+                                                                            _SIZE_EXPERTS)
   groups.all_experts = experts.select_all_experts(groups.precision,
                                                   groups.fscore,
                                                   groups.ci)
   groups.non_experts = groups.population.difference(groups.all_experts)
   sample_size = int(len(groups.non_experts) * _NON_EXPERTS_SAMPLE_SIZE)
+  sample_size_25 = int(len(groups.non_experts) * 0.05)
+  sample_size_10 = int(len(groups.non_experts) * 0.10)
+  sample_size_1 = int(len(groups.non_experts) * 0.01)
   groups.non_experts_sampled = set(random.sample(groups.non_experts, sample_size))
+  groups.non_experts_25 = set(random.sample(groups.non_experts, sample_size_25))
+  groups.non_experts_10 = set(random.sample(groups.non_experts, sample_size_10))
+  groups.non_experts_1 = set(random.sample(groups.non_experts, sample_size_1))
 
-  return groups
+  return groups, d_num_followers

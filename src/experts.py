@@ -536,6 +536,7 @@ def split_ci_experts_by_followers(ci_experts):
 
 def select_experts_social_bias(num_users, size_experts):
   users = {}
+  d_num_followers = {}
   with open('../data/SocialHubBias/user_info.tsv') as in_file:
     for line in in_file:
       tokens = line.split('\t')
@@ -543,6 +544,7 @@ def select_experts_social_bias(num_users, size_experts):
       num_followers = int(tokens[_USER_INFO_FILE_FOLLOWERS_COUNT_INDEX])
       screen_name = tokens[_USER_INFO_FILE_SCREEN_NAME_INDEX]
       users[user_id] = (num_followers, screen_name)
+      d_num_followers[user_id] = num_followers
   users_sorted = sorted(users.items(), key=lambda x: x[1][0], reverse=True)
   num_experts_to_select = min([len(users), int(num_users * size_experts)])
   experts = set()
@@ -551,7 +553,7 @@ def select_experts_social_bias(num_users, size_experts):
       user_id, (num_followers, screen_name) = users_sorted[i]
       out_file.write('%s\t%s\t%s\n' % (user_id, screen_name, num_followers))
       experts.add(user_id)
-  return experts
+  return experts, d_num_followers
 
 
 def select_super_experts(experts_precision, experts_fscore, experts_ci):
