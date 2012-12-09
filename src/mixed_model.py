@@ -54,7 +54,7 @@ def draw_precision_mixed(market_precisions, mixed_precisions, run_params_str):
 
 def draw_precision_recall_mixed(market_precisions, market_recalls,
                                 mixed_precisions, mixed_recalls,
-                                run_params_str):
+                                run_params_str, zoom=False):
   """Draws the precision recall graph for all the user groups and a given delta.
 
   Keyword Arguments:
@@ -94,7 +94,10 @@ def draw_precision_recall_mixed(market_precisions, market_recalls,
   plt.legend(loc=3)
 
   max_x = max([max(market_recalls), max(mixed_recalls), ])
-  plt.axis([0, max_x + 5, 0, 105])
+  if zoom:
+    plt.axis([0, max_x + 5, 40, 105])
+  else:
+    plt.axis([0, max_x + 5, 0, 105])
   plt.grid(True, which='major', linewidth=1)
 
   axs.xaxis.set_minor_locator(MultipleLocator(5))

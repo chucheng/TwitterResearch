@@ -42,6 +42,9 @@ class UserGroups:
   non_experts_10 = None
   non_experts_1 = None
   weighted_followers = None
+  ci_weighted = None
+  weighted = None
+  weighted_both = None
 
 
 def get_all_user_groups(delta=4, category=None):
@@ -111,7 +114,7 @@ def get_all_user_groups(delta=4, category=None):
   sample_size = int(len(groups.non_experts) * _NON_EXPERTS_SAMPLE_SIZE)
   sample_size_25 = int(len(groups.non_experts) * 0.05)
   sample_size_10 = int(len(groups.non_experts) * 0.10)
-  sample_size_1 = int(len(groups.non_experts) * 0.01)
+  sample_size_1 = int(len(groups.non_experts) * 0.02)
   groups.non_experts_sampled = set(random.sample(groups.non_experts, sample_size))
   groups.non_experts_25 = set(random.sample(groups.non_experts, sample_size_25))
   groups.non_experts_10 = set(random.sample(groups.non_experts, sample_size_10))

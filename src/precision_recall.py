@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 _GRAPH_DIR = Util.get_graph_output_dir('FolkWisdom/')
 
 
-def draw(precisions_list, recalls_list, labels, file_prefix, run_params_str):
+def draw(precisions_list, recalls_list, labels, file_prefix, run_params_str, zoom=False):
   plots = []
   figure = plt.figure()
   axs = figure.add_subplot(111)
@@ -31,15 +31,18 @@ def draw(precisions_list, recalls_list, labels, file_prefix, run_params_str):
       max_x = max_recall
 
   plt.legend(plots, labels, loc=0, ncol=2, columnspacing=0, handletextpad=0)
-  plt.axis([0, max_x + 5, 0, 105])
+  if zoom:
+    plt.axis([0, max_x + 5, 40, 105])
+  else:
+    plt.axis([0, max_x + 5, 0, 105])
   plt.grid(True, which='major', linewidth=1)
 
   axs.xaxis.set_minor_locator(MultipleLocator(5))
   axs.yaxis.set_minor_locator(MultipleLocator(5))
   plt.grid(True, which='minor')
 
-  plt.xlabel('Recall (%)')
-  plt.ylabel('Precision (%)')
+  plt.xlabel('Recall (%)', fontsize='16')
+  plt.ylabel('Precision (%)', fontsize='16')
 
   with open(_GRAPH_DIR + run_params_str + '/%s_%s.png'
             % (file_prefix, run_params_str), 'w') as graph:
@@ -52,21 +55,23 @@ def draw(precisions_list, recalls_list, labels, file_prefix, run_params_str):
 
 
 def draw_with_markers(precisions_list, recalls_list, labels, file_prefix,
-                      legend_location, run_params_str):
+                      legend_location, run_params_str, zoom=False, ncol=1):
   plots = []
   figure = plt.figure()
   axs = figure.add_subplot(111)
 
   line_types = ['-']
   line_widths = [1]
-  marker_types = ['bo', 'g^', 'rD', 'cs', 'm,']
+  marker_types = ['bo', 'g^', 'rD', 'cs', 'm,', 'yv']
+  marker_offsets = [0, 10, 20, 30]
 
   max_x = 0
   for plot_num, (precisions, recalls) in enumerate(zip(precisions_list, recalls_list)):
     precision_markers = []
     recall_markers = []
+    marker_offset = marker_offsets[plot_num % len(marker_offsets)]
     for (i, (precision, recall)) in enumerate(zip(precisions, recalls)):
-      if i % 40 == 0:
+      if i % 40 == marker_offset:
         precision_markers.append(precision)
         recall_markers.append(recall)
     line_type = line_types[plot_num % len(line_types)]
@@ -86,16 +91,19 @@ def draw_with_markers(precisions_list, recalls_list, labels, file_prefix,
     p = axs.plot([0], [0], line_type, label=label)
   plots.append(p)
 
-  plt.legend(loc=legend_location)
-  plt.axis([0, max_x + 5, 0, 105])
+  plt.legend(loc=legend_location, ncol=ncol)
+  if zoom:
+    plt.axis([0, max_x + 5, 40, 105])
+  else:
+    plt.axis([0, max_x + 5, 0, 105])
   plt.grid(True, which='major', linewidth=1)
 
   axs.xaxis.set_minor_locator(MultipleLocator(5))
   axs.yaxis.set_minor_locator(MultipleLocator(5))
   plt.grid(True, which='minor')
 
-  plt.xlabel('Recall (%)')
-  plt.ylabel('Precision (%)')
+  plt.xlabel('Recall (%)', fontsize='16')
+  plt.ylabel('Precision (%)', fontsize='16')
 
   with open(_GRAPH_DIR + run_params_str + '/%s_%s.png'
             % (file_prefix, run_params_str), 'w') as graph:
@@ -173,5 +181,8 @@ def get_precision_recalls(gt_rankings, rankings):
   precisions.non_experts_1, recalls.non_experts_1 = calc_precision_recall(gt_rankings, rankings.non_experts_1)
   precisions.super_experts, recalls.super_experts = calc_precision_recall(gt_rankings, rankings.super_experts)
   precisions.weighted_followers, recalls.weighted_followers = calc_precision_recall(gt_rankings, rankings.weighted_followers)
+  precisions.ci_weighted, recalls.ci_weighted = calc_precision_recall(gt_rankings, rankings.ci_weighted)
+  precisions.weighted, recalls.weighted = calc_precision_recall(gt_rankings, rankings.weighted)
+  precisions.weighted_both, recalls.weighted_both = calc_precision_recall(gt_rankings, rankings.weighted_both)
 
   return precisions, recalls

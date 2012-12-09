@@ -10,6 +10,8 @@ from constants import _TIMEDELTAS_FILE_DELTA_INDEX
 from constants import _TIMEDELTAS_FILE_CATEGORY_INDEX
 
 from params import _SWITCHED
+from params import _CI_WEIGHT
+from params import _WEIGHT
 
 
 def gather_tweet_counts(hours, seeds, groups, d_num_followers, category=None):
@@ -51,6 +53,9 @@ def gather_tweet_counts(hours, seeds, groups, d_num_followers, category=None):
   tweet_counts.non_experts_10 = {}
   tweet_counts.non_experts_1 = {}
   tweet_counts.weighted_followers = {}
+  tweet_counts.ci_weighted = {}
+  tweet_counts.weighted = {}
+  tweet_counts.weighted_both = {}
 
   with open('../data/FolkWisdom/time_deltas.tsv') as input_file:
     for line in input_file:
@@ -101,6 +106,18 @@ def gather_tweet_counts(hours, seeds, groups, d_num_followers, category=None):
             weight = math.log(num_followers)
           increment_tweet_count(groups.ci, tweet_counts.weighted_followers, user_id, url, weight=weight)
 
+          # Weighted ci model
+          increment_tweet_count(groups.ci_hi, tweet_counts.ci_weighted, user_id, url, weight=_CI_WEIGHT)
+          increment_tweet_count(groups.ci_li, tweet_counts.ci_weighted, user_id, url, weight=(1 - _CI_WEIGHT))
+
+          # Weighted Model
+          increment_tweet_count(groups.non_experts, tweet_counts.weighted, user_id, url, weight=_WEIGHT)
+          increment_tweet_count(groups.ci, tweet_counts.weighted, user_id, url, weight=(1 - _WEIGHT))
+
+          # Weighted (Both)
+          increment_tweet_count(groups.non_experts, tweet_counts.weighted_both, user_id, url, weight=_WEIGHT)
+          increment_tweet_count(groups.ci_hi, tweet_counts.weighted_both, user_id, url, weight=((1 - _WEIGHT) * _CI_WEIGHT))
+          increment_tweet_count(groups.ci_li, tweet_counts.weighted_both, user_id, url, weight=((1 - _WEIGHT) * (1 - _CI_WEIGHT)))
                 
   return tweet_counts
 
@@ -151,6 +168,9 @@ def sort_tweet_counts(tweet_counts):
   rankings.super_experts = sorted(tweet_counts.super_experts.items(), key=lambda x: x[1], reverse=True)
   rankings.social_bias = sorted(tweet_counts.social_bias.items(), key=lambda x: x[1], reverse=True)
   rankings.weighted_followers = sorted(tweet_counts.weighted_followers.items(), key=lambda x: x[1], reverse=True)
+  rankings.ci_weighted = sorted(tweet_counts.ci_weighted.items(), key=lambda x: x[1], reverse=True)
+  rankings.weighted = sorted(tweet_counts.weighted.items(), key=lambda x: x[1], reverse=True)
+  rankings.weighted_both = sorted(tweet_counts.weighted_both.items(), key=lambda x: x[1], reverse=True)
   return rankings
 
 

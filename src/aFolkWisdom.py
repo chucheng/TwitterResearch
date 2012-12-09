@@ -231,6 +231,7 @@ def run():
       for rank, (url, count) in enumerate(ranks.super_experts):
         expert_s_rank_to_url[rank] = url
 
+      population_url_to_rank = {}
       market_url_to_rank = {}
       precision_url_to_rank = {}
       fscore_url_to_rank = {}
@@ -239,6 +240,8 @@ def run():
       ci_2_url_to_rank = {}
       ci_3_url_to_rank = {}
       common_url_to_rank = {}
+      for rank, (url, count) in enumerate(ranks.population):
+        population_url_to_rank[url] = rank
       for rank, (url, count) in enumerate(ranks.non_experts):
         market_url_to_rank[url] = rank
       for rank, (url, count) in enumerate(ranks.precision):
@@ -259,7 +262,7 @@ def run():
       precisions, recalls = precision_recall.get_precision_recalls(gt_rankings, ranks)
 
       mixed_rankings = mixed_model.get_mixed_rankings(market_url_to_rank,
-                                                      precisions.population,
+                                                      precisions.non_experts,
                                                       precision_url_to_rank,
                                                       precisions.precision,
                                                       fscore_url_to_rank,
@@ -268,8 +271,18 @@ def run():
                                                       precisions.ci,
                                                       ground_truth_url_to_rank)
 
+      mixed_inact_rankings = mixed_model.get_mixed_rankings(common_url_to_rank,
+                                                            precisions.common_users,
+                                                            precision_url_to_rank,
+                                                            precisions.precision,
+                                                            fscore_url_to_rank,
+                                                            precisions.fscore,
+                                                            ci_url_to_rank,
+                                                            precisions.ci,
+                                                            ground_truth_url_to_rank)
+
       mixed_ci_rankings = mixed_model.get_mixed_rankings(market_url_to_rank,
-                                                         precisions.population,
+                                                         precisions.non_experts,
                                                          ci_1_url_to_rank,
                                                          precisions.ci_1,
                                                          ci_2_url_to_rank,
@@ -281,6 +294,9 @@ def run():
 
       mixed_precisions, mixed_recalls = precision_recall.calc_precision_recall(gt_rankings, 
                                                                                mixed_rankings)
+
+      mixed_inact_precisions, mixed_inact_recalls = precision_recall.calc_precision_recall(gt_rankings, 
+                                                                                           mixed_inact_rankings)
 
       mixed_ci_precisions, mixed_ci_recalls = precision_recall.calc_precision_recall(gt_rankings, 
                                                                                      mixed_ci_rankings)
@@ -430,13 +446,20 @@ def run():
                                             run_params_str)
 
       log('Drawing experts precision-recall graph...')
-      # precision_recall.draw([precisions.non_experts, precisions.precision,
-      #                        precisions.fscore, precisions.ci],
-      #                       [recalls.non_experts, recalls.precision,
-      #                        recalls.fscore, recalls.ci],
-      #                       ['Crowd', 'Precision', 'F-score', 'CI'],
-      #                       'precision_recall_experts',
-      #                       run_params_str)
+      # precision_recall.draw_with_markers([precisions.population, precisions.non_experts, precisions.precision,
+      #                                     precisions.fscore, precisions.ci],
+      #                                    [recalls.population, recalls.non_experts, recalls.precision,
+      #                                     recalls.fscore, recalls.ci],
+      #                                    ['Population', 'Crowd', 'Precision', 'F-score', 'CI'],
+      #                                    'precision_recall_experts',
+      #                                    0, run_params_str)
+
+      log('Drawing mixed + inact graph...')
+      precision_recall.draw_with_markers([precisions.non_experts, precisions.common_users, mixed_inact_precisions],
+                                         [recalls.non_experts, recalls.common_users, mixed_inact_recalls],
+                                         ['Crowd', 'Inactive Crowd', 'Mixed + Inactive'],
+                                         'precision_recall_mixed_and_inactive',
+                                         3, run_params_str, zoom=True)
 
       log('Drawing ci breakdown by followers precisions-recall graph...')
       precision_recall.draw([precisions.non_experts, precisions.ci,
@@ -473,25 +496,25 @@ def run():
                             [recalls.non_experts, recalls.common_users],
                             ['Crowd', 'Inactive Crowd'],
                             'precision_recall_crowd_def',
-                            run_params_str)
+                            run_params_str, zoom=True)
 
       log('Drawing non_expert_sampling precision-recall graph...')
       precision_recall.draw_with_markers([precisions.non_experts, precisions.non_experts_sampled,
                                           precisions.non_experts_10, precisions.non_experts_25,
-                                          precisions.non_experts_1],
+                                          precisions.non_experts_1, precisions.ci],
                                           [recalls.non_experts, recalls.non_experts_sampled,
                                            recalls.non_experts_10, recalls.non_experts_25,
-                                           recalls.non_experts_1],
+                                           recalls.non_experts_1, recalls.ci],
                                           ['Crowd', 'Crowd (33% sample)', 'Crowd (10% sample)',
-                                           'Crowd (5% sample)', 'Crowd (1% sample)'],
+                                           'Crowd (5% sample)', 'Crowd (2% sample)', 'Experts (CI)'],
                                           'precision_recall_non_expert_sampling',
-                                          0, run_params_str)
+                                          3, run_params_str, ncol=2)
 
       # TODO: Replace with new method.
       log('Drawing mixed model precision-recall graph...')
       mixed_model.draw_precision_recall_mixed(precisions.non_experts, recalls.non_experts,
                                               mixed_precisions, mixed_recalls,
-                                              run_params_str)
+                                              run_params_str, zoom=True)
 
       log('Drawing mixed ci model precision-recall graph...')
       precision_recall.draw([precisions.non_experts, mixed_ci_precisions],
@@ -505,6 +528,27 @@ def run():
                             [recalls.non_experts, recalls.weighted_followers, recalls.ci],
                             ['Crowd', 'Weighted Followers', 'CI'],
                             'precision_recall_weighted_followers',
+                            run_params_str)
+
+      log('Drawing ci weighted graph...')
+      precision_recall.draw([precisions.population, precisions.ci, precisions.ci_weighted],
+                            [recalls.population, recalls.ci, recalls.ci_weighted],
+                            ['Crowd', 'CI', 'CI (Weighted)'],
+                            'precision_recall_ci_weighted',
+                            run_params_str)
+
+      log('Drawing weighted graph...')
+      precision_recall.draw([precisions.population, precisions.weighted],
+                            [recalls.population, recalls.weighted],
+                            ['Crowd', 'Crowd (Weighted)'],
+                            'precision_recall_weighted',
+                            run_params_str)
+
+      log('Drawing weighted both graph...')
+      precision_recall.draw([precisions.population, precisions.weighted, precisions.weighted_both],
+                            [recalls.population, recalls.weighted, recalls.weighted_both],
+                            ['Crowd', 'Crowd (Weighted)', 'Crowd (Weighted Both)'],
+                            'precision_recall_weighted_both',
                             run_params_str)
 
 
